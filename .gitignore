@@ -5,3 +5,6 @@
 src/Cleaned/*
 src/Treated/*
 *.xlsx
+*.csv
+
+.env

@@ -1,17 +1,32 @@
 import fs from "fs";
-import XLSX from 'XLSX'
-
-import { MetricsCSVFile } from "./MetricsCSVFile";
-import { Queue } from "./Queue";
+import XLSX from 'xlsx'
+import { AWSMetrics } from "./AWSMetricsFileHandler";
 
 export class Report {
-    private srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
+    public srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
 
-    private rawDirPath = this.srcCodeBaseDir + "/Raw";
-    private cleanedDirPath = this.srcCodeBaseDir + "/Cleaned";
     private treatedDirPath = this.srcCodeBaseDir + "/Treated";
 
+    private applications = {
+        PG: [
+            "CPUUtilization_-_SQL_WWW",
+            "CPUUtilization_-_WEBs",
+            "Memória_Apicação_WEB",
+            "Memória_SQL_WWW",
+        ],
+        SP: [
+            "SQL_SERVER_-_CPU",
+            "Quiver_PRO",
+            "Memória_Banco_QuiverPRO",
+            "Memória_AppQuiverPRO"
+        ]
+    }
+
+    public workbook: XLSX.WorkBook;
+
     constructor() {
+        this.workbook = XLSX.utils.book_new();
+
         this.checkStructureIntegrity();
     }
 
@@ -26,40 +41,34 @@ export class Report {
 
     isStructureCreated = (sourceDirPathList: string[]) => (sourceDirPathList.filter(dir => (dir == 'Cleaned' || dir == 'Raw' || dir == 'Treated')))
 
-    async generateReport() {
-        new Queue().checkFilesQueue()
-            .then(fileNames =>
-                fileNames.map(fileName => new MetricsCSVFile(fileName))
-            ).then(data => {
-                data.map( report => {
-                    this.buildReportExcel(report);
-                } )
-            });
-
+    setWorkbook(workbook: XLSX.WorkBook) {
+        this.workbook = workbook;
     }
 
-    buildReportExcel(reportFile: MetricsCSVFile) {
+    public buildExcel(reportFile: AWSMetrics, path = this.treatedDirPath) {
         let days = Object.keys(reportFile.metricsByDay);
-
-        var workbook = XLSX.utils.book_new();
-
+        
         days.forEach(day => {
-            console.log(reportFile.metricsByDay[day].filter((timeMetric: any) => timeMetric.hour >= 8 && timeMetric.hour <= 19));
-
-            let worksheet = XLSX.utils.json_to_sheet(reportFile.metricsByDay[day]);
-
-            let sheetName = day.split('/').map((number, idx) => idx <= 1 ? number.padStart(2, '0') : number).join(' ');
-
-            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            const worksheet = this.creteWorkbook(reportFile.metricsByDay[day])
+            console.log(reportFile.metricsByDay);
+            
+            XLSX.utils.book_append_sheet(this.workbook, worksheet, day);
         })
 
-        // var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
+        // console.log("Day metrics into workbook", this.treatedDirPath, this.workbook, "\n");
 
-        // XLSX.writeFileXLSX(
-        //     workbook,
-        //     `${this.treatedDirPath}/FINISH - ${new Date().getDate()} ${new Date().getMonth()}.xlsx`,
-        //     wopts
-        // );
+        var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
+
+        XLSX.writeFileXLSX(
+            this.workbook,
+            `${path}/${reportFile.fileName}.xlsx`,
+            wopts
+        );
+    }
+
+    creteWorkbook( jsonData: object[] ) {
+        let worksheet = XLSX.utils.json_to_sheet(jsonData);
+        return worksheet
     }
 
 }

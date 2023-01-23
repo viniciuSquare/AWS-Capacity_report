@@ -1,29 +1,27 @@
 import fs from "fs";
 
 export class Queue {
-    public filesToProcess: string[] = [];
-    private srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length-1).join('/');
+    private srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
 
-    private rawDirPath     = this.srcCodeBaseDir + "/Raw";
-    private cleanedDirPath = this.srcCodeBaseDir + "/Cleaned";
+    private rawDirPath = this.srcCodeBaseDir + "/Raw";
     private treatedDirPath = this.srcCodeBaseDir + "/Treated";
 
-    constructor() { }
-
     /**
-     *  Update queue array of uncleaned files
+     *  Update queue array of untreated files
      * @returns unprocessed files array
      */
-    async checkFilesQueue() {
-        let rawFilesList    : string[] = await fs.readdirSync(`${this.rawDirPath}`, "utf-8");
-        let cleanedFilesList: string[] = await fs.readdirSync(`${this.cleanedDirPath}`, "utf-8");
+    async filesToProcess() {
+        let rawFilesList: string[] = await fs.readdirSync(`${this.rawDirPath}`, "utf-8");
+        let treatedFilesList: string[] = await fs.readdirSync(`${this.treatedDirPath}`, "utf-8");
 
-        this.filesToProcess = rawFilesList.filter(
-            (fileName) => !cleanedFilesList.includes(fileName)
+        const filesOnQueue = rawFilesList.filter(
+            (fileName) => !treatedFilesList.includes("FINISH - " + fileName) && fileName.includes('.csv')
         );
 
-        console.log("Uncleaned files", this.filesToProcess);
+        filesOnQueue.length
+            ? console.log(filesOnQueue.length, " files on queue: ", filesOnQueue)
+            : console.log("None file on queue")
 
-        return this.filesToProcess
+        return filesOnQueue;
     }
 }
