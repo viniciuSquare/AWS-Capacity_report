@@ -1,27 +1,29 @@
 # AWS Capacity Report handler
 This tool must help AWS metrics reports generation to performance analysis.
-#### Building report manually
-**Now days** this is done daily and manually, day-by-day:
 
-AWS metrics dashboard CPU and Memory data as CSV reports are formatted: numbers fixed and business period filtered. So data is pasted into a sheet with instances label as header, when all days of the week are completed, the week report is compiled with day's data.  
-
-# Development context
-Recently changed into DevOps, the report to be improved is used by our leader to keep track of our server's instances performance metrics,
-
-# Running the project
----
+### Running the project
 With **nodeJS** installed, execute the commands:
 - To install dependencies `` npm install ``
 - Then run with `` npm start `` after set directories to **raw CSV files**, metadata - `MetricsByDashboardName` map and `AWSDetails` to **outputReport**.
    !! Theses paths are hard coded for now !!
 
+---
+
+# Development context
+Recently changed from Laravel/Angular dev into DevOps, where most of our infrastructure are on AWS. There is a report used to keep track of our server's instances performance metrics, today this report is done manually.
+#### 😮‍💨 Building report manually
+AWS CPU and Memory metrics data are extracted from a dashboards as CSV reports, so they are formatted: numbers fixed and business period filtered. Data is pasted into a sheet with instances label as header, when all days of the week are completed, the week report is compiled with day's data.  
+
 ## How does it work?
-Data from CSV file is treated, filtered by business work time and grouped by day - *week data processing to be developed*
+Data from CSV file is treated, filtered by business work time and grouped by day and XLSX workbook is generated, a sheet / day.
+   - *Week data processing to be developed*
+
 - Simplistic sequence diagram of data flow. Async methods to return data within these shown methods need to be improved.
 ![Data flow from raw file reading to XLSX report generation](docs/SequenceDiagram.png)
+
 **Main structures**
-![Classes diagram](docs/Classes.png)
-![Data structures](docs/DataStructures.png)
+| ![Classes diagram](docs/Classes.png) | ![Data structures](docs/DataStructures.png) |
+| --- | --- |
 
 | Class | Functionally |
 | --- |     ---    |
