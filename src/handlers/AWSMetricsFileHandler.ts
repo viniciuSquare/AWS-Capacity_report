@@ -91,9 +91,9 @@ export class AWSMetrics extends CSVFile {
 
         days.forEach(day => {
             if (this.isBusinessDay(new Date(day))) {
-                metricsByDayFiltered[this.treatDayProp(day)] = []
+                metricsByDayFiltered[day] = []
 
-                metricsByDayFiltered[this.treatDayProp(day)]
+                metricsByDayFiltered[day]
                     .push(...metricsGroupedByDay[day].filter( (metric: FormattedData) => this.isBusinessHour(metric.hour)));
             }
         })
@@ -112,7 +112,7 @@ export class AWSMetrics extends CSVFile {
     async formattedData() {
         let formattedData: any[] = []
 
-        await Promise.all(
+        const data = await Promise.all(
             this.rawContentArray.map(async (row, line) => {
                 if (line == 0) return // Skip header
                 let currentIdx = line - 1
@@ -144,6 +144,9 @@ export class AWSMetrics extends CSVFile {
                 return await Promise.all(headerPromises).then((result) => result)
             })
         ).then((result) => result.flat())
+
+        console.log(data);
+        
         return formattedData;
     }
 

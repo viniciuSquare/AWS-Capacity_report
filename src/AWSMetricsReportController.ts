@@ -34,10 +34,7 @@ export class AWSMetricsController {
 
         const filesFromQueue = await new Queue().filesToProcess()
 
-        const metricsFromFiles = await filesFromQueue.map((file) => {
-            let metric = new AWSMetrics(file);
-            return metric
-        })
+        const metricsFromFiles = filesFromQueue.map((file) => new AWSMetrics(file))
 
         return await Promise.all(metricsFromFiles.map(async metric =>  await metric.feedDataFromFile()))
             .then(()=> metricsFromFiles)

@@ -159,7 +159,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_06",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-07657ac99abfc46a3",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb",
@@ -208,7 +208,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_07",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-069620b5ca09638cf",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb",
@@ -257,7 +257,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_08",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-073b4efd7f0228cd5",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb",
@@ -306,7 +306,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_09",
-      "State": "stopped",
+      "State": "stopping",
       "InstanceId": "i-03872ade62bc8225a",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb",
@@ -355,7 +355,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_10",
-      "State": "stopped",
+      "State": "stopping",
       "InstanceId": "i-09aa94826005e35f9",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb",
@@ -614,7 +614,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_03",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-0b8b99a020b2df471",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb",
@@ -700,7 +700,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_04",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-0b74bd7709a203038",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb",
@@ -1158,7 +1158,7 @@
     {
       "Produto": "PRO",
       "Label": "AppQuiverPro_05",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-0abf6b36aa2a2dc8d",
       "InstanceType": "c6i.2xlarge",
       "KeyName": "colweb-novo",
@@ -1199,7 +1199,7 @@
     {
       "Produto": "PRO",
       "Label": "MultTools",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-05349df0d1a46b218",
       "InstanceType": "t3a.small",
       "KeyName": "web1-docker",
@@ -1343,7 +1343,7 @@
     },
     {
       "Label": "Cliente - Toyota Dev",
-      "State": "stopped",
+      "State": "running",
       "InstanceId": "i-0088f346a1aa2c40d",
       "InstanceType": "t3a.small",
       "KeyName": "Chave-Toyota-Dev",
