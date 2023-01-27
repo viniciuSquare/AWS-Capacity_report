@@ -1,35 +1,13 @@
 import fs from 'fs';
 import XLSX from 'xlsx';
 
-
-import AWS, { AppIntegrations, CloudFormation } from 'aws-sdk'
-import { CSVFile as handler } from './CSVFile';
+import AWS from 'aws-sdk'
+import { AWSDetails, InstanceDetails } from '../shared/Types';
 require('dotenv').config();
 
-interface InstanceDetails {
-    InstanceId: string | undefined,
-    Region: string | undefined,
-    Produto: string | undefined,
-    Label: string | undefined,
-    State: string | undefined,
-    InstanceType: string | undefined,
-    KeyName: string | undefined,
-    Monitoring: string | undefined,
-    Platform: string | undefined,
-    PrivateDnsName: string | undefined,
-    PrivateIpAddress: string | undefined,
-    PublicDnsName: string | undefined,
-    PublicIpAddress: string | undefined,
-    Tags: AWS.EC2.TagList | undefined,
-    PlatformDetails: string | undefined,
-}
-
-interface Metadata {
-    region: string,
-    instances?: (InstanceDetails | undefined)[] | undefined
-}
-
 export class InstancesMetadataHelper {
+
+    public metadata: AWSDetails;
 
     static projectDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
     private metadataDir: string = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/') + '/Metadata';
@@ -39,8 +17,6 @@ export class InstancesMetadataHelper {
         accessKeyId: process.env.ACCESS_KEY_ID ? process.env.ACCESS_KEY_ID : "EMPTY",
         secretAccessKey: process.env.SECRET_ACCESS_KEY ? process.env.SECRET_ACCESS_KEY : "EMPTY"
     }
-
-    public metadata: Metadata;
 
     constructor(
         private region: string
@@ -52,40 +28,48 @@ export class InstancesMetadataHelper {
         this.metadata.region = region;
     }
 
-    getMetadata() {
-        return this.metadata
+    async getMetadata() {
+        // if(await this.regionInstancesAreMapped()) {
+        //     const metadataString = await fs.readFileSync(`${this.metadataDir}/${this.region}.json`, `utf-8`)
+        //     this.metadata = JSON.parse(metadataString)
+            
+        //     console.log("Parsed and applied metadata ");
+
+        // } else {
+            console.log(" !!! Não estão mepeados !!!");
+            await this.feedMetadata()
+        // }
+        return this.metadata;
     }
 
-    async feedInstancesData() {
+    private async feedMetadata() {
+        // Instances data 
+        this.ec2 = new AWS.EC2({
+            region: this.metadata.region,
+            credentials: new AWS.Credentials(this.credentials)
+        });
 
-        if(await !this.regionInstancesAreMapped()) {
+        console.log('Fetching instances descriptions from AWS to map services instances...\n');
 
-            this.ec2 = new AWS.EC2({
-                region: this.metadata.region,
-                credentials: new AWS.Credentials(this.credentials)
-            });
-    
-            console.log('Fetching instances descriptions to map services instances...\n');
-            
-            this.ec2.describeInstances((err, data) => {
-                console.log('Feeding instances\n');
-                this.metadata.instances = data.Reservations?.map(this.mapInstanceData).flat()                
-            })
-            
+        let ec2InstancesDescriptionPromise = this.ec2.describeInstances().promise();
+
+        return ec2InstancesDescriptionPromise.then( data => {
+            console.log('Feeding instances\n');
+            this.metadata.instances = data.Reservations?.map(this.mapInstanceData).flat()
+
             // Saving data
             // this.saveInstancesToExcelFile();
             this.saveInstancesToJSONFile();
-        };
-
-
+            return this.metadata;
+        } )
     }
 
-    private async regionInstancesAreMapped(): Promise<boolean> {
+    async regionInstancesAreMapped(): Promise<boolean> {
         const data = await fs.readdirSync(this.metadataDir, 'utf-8')
 
-        console.log('Instances metadata saved: ', data);
+        console.log('Instances metadata saved: ', data, data.indexOf(this.region + '.json'), data.indexOf(this.region + '.xlsz'));
 
-        return data.indexOf(this.region+'.json') < 0 || data.indexOf(this.region+'.xlsx') < 0
+        return data.indexOf(this.region + '.json') >= 0 || data.indexOf(this.region + '.xlsx') >= 0
     }
 
     private mapInstanceData(reservations: AWS.EC2.Reservation) {
@@ -125,26 +109,29 @@ export class InstancesMetadataHelper {
     }
 
     private saveInstancesToJSONFile() {
-        console.log('Saving JSON file with instances!!\n');
+        const parsedData = JSON.stringify(this.metadata, null, 2)
+        console.log('Saving JSON file with instances!!\n', parsedData);
         fs.writeFile(
             `${this.metadataDir}/${this.region}.json`,
-            JSON.stringify(this.metadata, null, 2),
-            (err) => err ? console.log(err) : console.log("Data saves successfully!!\n")
+            parsedData, "utf-8",
+            (err) => {
+                err ? console.log(err) : console.log("Data saves successfully!!\n")
+            }
         )
     }
 
     private saveInstancesToExcelFile() {
-        const data = this.metadata.instances ? this.metadata.instances?.map( instance => {
+        const data = this.metadata.instances ? this.metadata.instances?.map(instance => {
             return {
                 Produto: instance?.Produto,
                 Label: instance?.Label,
                 Id: instance?.InstanceId,
                 KeyName: instance?.KeyName,
-                InstanceType: instance?.InstanceType,                
+                InstanceType: instance?.InstanceType,
             }
-        } ) : []
+        }) : []
 
-        const worksheet = XLSX.utils.json_to_sheet( data );
+        const worksheet = XLSX.utils.json_to_sheet(data);
 
         const fileName = `${this.metadataDir}/${this.region}.xlsx`
 
@@ -166,7 +153,7 @@ export class InstancesMetadataHelper {
      * -----------------------------
      * Usable instances arrayfilters 
      * -----------------------------
-     * */ 
+     * */
 
     static instanceLabelOrProductContains = (
         instance: InstanceDetails | undefined, name: string

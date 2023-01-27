@@ -1,26 +1,10 @@
 import fs from "fs";
 import XLSX from 'xlsx'
 import { AWSMetrics } from "./AWSMetricsFileHandler";
-
 export class Report {
     public srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
 
-    private treatedDirPath = this.srcCodeBaseDir + "/Treated";
-
-    private applications = {
-        PG: [
-            "CPUUtilization_-_SQL_WWW",
-            "CPUUtilization_-_WEBs",
-            "Memória_Apicação_WEB",
-            "Memória_SQL_WWW",
-        ],
-        SP: [
-            "SQL_SERVER_-_CPU",
-            "Quiver_PRO",
-            "Memória_Banco_QuiverPRO",
-            "Memória_AppQuiverPRO"
-        ]
-    }
+    private treatedDirPath = this.srcCodeBaseDir + "/Treated";    
 
     public workbook: XLSX.WorkBook;
 
@@ -39,34 +23,47 @@ export class Report {
         }
     }
 
-    isStructureCreated = (sourceDirPathList: string[]) => (sourceDirPathList.filter(dir => (dir == 'Cleaned' || dir == 'Raw' || dir == 'Treated')))
+    isStructureCreated = (sourceDirPathList: string[]) => (sourceDirPathList.filter(dir => ( dir == 'Raw' || dir == 'Treated' )))
 
     setWorkbook(workbook: XLSX.WorkBook) {
         this.workbook = workbook;
     }
 
-    public buildExcel(reportFile: AWSMetrics, path = this.treatedDirPath) {
-        let days = Object.keys(reportFile.metricsByDay);
-        
-        days.forEach(day => {
-            const worksheet = this.creteWorkbook(reportFile.metricsByDay[day])
-            console.log(reportFile.metricsByDay);
-            
-            XLSX.utils.book_append_sheet(this.workbook, worksheet, day);
+    public async buildExcel(reportFile: AWSMetrics, path = this.treatedDirPath) {
+        const metricsReportDetails = reportFile.identifyMetric(reportFile);
+        // TODO - Verify if is it created
+        const metricsByDay = await reportFile.metricsByDay()
+
+        let days = Object.keys(metricsByDay );
+
+        console.log("days ", metricsByDay);
+
+        const worksheets = days.map( async day => {
+            const metricByDay = await reportFile.metricsByDay();
+            const worksheet = this.creteWorkbook(metricByDay[day])
+            // console.log(reportFile.metricsByDay());
+            return { day, worksheet }
+        }) 
+
+        await Promise.all(worksheets).then(data => {
+            data.map( ({ day, worksheet }) => {
+                XLSX.utils.book_append_sheet(this.workbook, worksheet, day);
+            } )
+        }).then(()=> {
+            var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
+            console.log("Day metrics into workbook", this.treatedDirPath, "\n");
+    
+            XLSX.writeFileXLSX(
+                this.workbook,
+                `${path}/${reportFile.fileName}.xlsx`,
+                wopts
+            );
         })
 
-        // console.log("Day metrics into workbook", this.treatedDirPath, this.workbook, "\n");
 
-        var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
-
-        XLSX.writeFileXLSX(
-            this.workbook,
-            `${path}/${reportFile.fileName}.xlsx`,
-            wopts
-        );
     }
 
-    creteWorkbook( jsonData: object[] ) {
+    creteWorkbook(jsonData: object[]) {
         let worksheet = XLSX.utils.json_to_sheet(jsonData);
         return worksheet
     }
