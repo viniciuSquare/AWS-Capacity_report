@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator erd {
+  provider = "prisma-erd-generator"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Metrics {
+  id           Int            @id @default(autoincrement())
+  resource     MetricResource
+  service      MetricService
+  instanceId   Int
+  maximumUsage Float
+  date         DateTime
+
+  instance Instances @relation(fields: [instanceId], references: [id])
+
+  @@unique([resource, service, instanceId, date])
+}
+
+enum MetricService {
+  Application
+  Database
+}
+
+enum MetricResource {
+  CPU
+  Memory
+}
+
+model Instances {
+  id               Int       @id @default(autoincrement())
+  instanceId       String?
+  region           String?
+  product          String?
+  label            String?
+  state            String?
+  instanceType     String?
+  keyName          String?
+  monitoring       String?
+  platform         String?
+  privateDnsName   String?
+  privateIpAddress String?
+  publicDnsName    String?
+  publicIpAddress  String?
+  tags             Json?
+  platformDetails  String?
+  Metrics          Metrics[]
+
+  @@map("instances_details")
+}
+
+model AWSDashboardDetails {
+  id            Int            @id @default(autoincrement())
+  dashboardName String
+  service       MetricService
+  resource      MetricResource
+  product       QuiverProducts
+
+  @@map("aws_dashboard_details")
+}
+
+enum QuiverProducts {
+  Quiver_PRO
+  Quiver_PLUS
+}

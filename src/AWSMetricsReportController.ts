@@ -2,29 +2,37 @@ import { AWSMetrics } from "./handlers/AWSMetricsFileHandler";
 import { InstancesMetadataHelper } from "./handlers/InstancesMap";
 import { Queue } from "./handlers/Queue";
 import { Report } from "./handlers/Reports";
-import { AWSDetails } from "./shared/Types";
+import { AWSDetails, MetricDetails } from "./shared/Types";
 export class AWSMetricsController {
 
-    reportMetadata: AWSDetails | null = null
-
-    constructor() {
-        // check the queue
-        // IF THERE IS REPORT FILE TO PROCESS
-        // TODO ->  VERIFY INSTANCES MAP FILE
-    }
+    // Instances details
+    awsDetails?: AWSDetails;
+    metricDetails?: MetricDetails;
 
     async generateReportsFromFilesOnQueue() {
-        const metricsToProcess = await this.getMetricsFromFileQueue()
+        const metricsToProcess = await this.getMetricsFromFileQueue();
 
+        /**
+         * * Processing metric reports
+         *      AWS metadata is fetch 
+         *      For each csv report, 
+         * */ 
         metricsToProcess.forEach(
-            async metric => {
-                const metadata = await this.getMetricMetadata(metric)
+            async awsMetricsReport => {
+                const awsInstancesMetadata = await this.feedMetadataFromFileMetadata( awsMetricsReport );
 
-                if (metadata)
-                    metric.setInstancesDetails(metadata)
+                if (awsInstancesMetadata)
+                    awsMetricsReport.setInstancesDetails(awsInstancesMetadata)
+                await awsMetricsReport.feedMetricsFromFile();
                 
-                console.log('END - Generating report from metric');
-                await new Report().buildExcel(metric);
+                console.log(awsMetricsReport.metrics);
+
+                if(awsMetricsReport.metrics) {
+                    awsMetricsReport.metrics.map( metric => metric?.safeStore().then( prismaMetric => console.log("\n Persisted ", prismaMetric) ) )
+                }
+                
+                // console.log('\nEND - Generating report from metric');
+                // await new Report().buildExcel(awsMetricsReport);
             }
         )
     }
@@ -40,35 +48,46 @@ export class AWSMetricsController {
             .then(()=> metricsFromFiles)
     }
 
-    private async getMetricMetadata(metric: AWSMetrics) {
+    private async feedMetadataFromFileMetadata(metric: AWSMetrics) {
         console.log("Metadata verification for ", metric.region," region.")
 
-        if (!(this.reportMetadata?.region == metric.region)) {
-            this.reportMetadata = {
+        const resource = metric.metricResource
+        const service = metric.metricService
+        
+        this.metricDetails = {
+            resource: resource,
+            service: service
+        }
+
+        if (!(this.awsDetails?.region == metric.region)) {
+            this.awsDetails = {
                 region: metric.region
             }
 
-            console.log("►► Metadata will be fetch for ", this.reportMetadata?.region, metric.region)
+            console.log("►► Metadata will be fetch for ", this.awsDetails?.region, metric.region)
 
             await this.feedInstanceDetailsMetadata();
         }
 
         console.log("Metadata is already updated")
-        return this.reportMetadata;
+        return this.awsDetails;
     }
 
     private async feedInstanceDetailsMetadata() {
         console.log("\n►►► Feeding metadata")
 
-        if (this.reportMetadata?.region) {
-            const metadata = new InstancesMetadataHelper(this.reportMetadata.region)
-            this.reportMetadata = await metadata.getMetadata()
+        if (this.awsDetails?.region) {
+            const metadata = new InstancesMetadataHelper(this.awsDetails)
+            const { instances } = await metadata.getMetadata()
 
-            console.log("> Metadata fed \n");
+            this.awsDetails.instances = instances
 
+            console.log(`> Metadata fed,\n`);
             return
-        }
+        } console.error("Region is not defined ");
+    }
 
-        console.error("Region is not defined ");
+    private feedMetricsMetadata() {
+
     }
 }

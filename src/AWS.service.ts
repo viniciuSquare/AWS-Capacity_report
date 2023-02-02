@@ -75,7 +75,7 @@ function mapInstanceData(instance: AWS.EC2.Instance) {
   } = instance
 
   const mappedData = {
-    Produto: Tags?.find( tag => tag.Key == 'produto' )?.Value || undefined,
+    Produto: Tags?.find( tag => tag.Key == 'product' )?.Value || undefined,
     Label: Tags?.find( tag => tag.Key == 'Name' )?.Value || undefined,
     State: State?.Name,
     InstanceId,
