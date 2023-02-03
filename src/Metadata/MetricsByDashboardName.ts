@@ -4,65 +4,57 @@ export const metricsByDashboardName: DashboardMetadata[] = [
     {
         dashboardName: "CPUUtilization_-_SQL_WWW",
         // account: "PG",
-        metricDetails: {
-            service: "Database",
-            metric: "CPU"
-        }
+        service: "Database",
+        resource: "CPU",
+        product: "Quiver PLUS"
     },
     {
         dashboardName: "CPUUtilization_-_WEBs",
         // account: "PG",
-        metricDetails: {
-            service: "Application",
-            metric: "CPU"
-        }
+        service: "Application",
+        resource: "CPU",
+        product: "Quiver PLUS"
     },
     {
         dashboardName: "Memória_SQL_WWW",
         // account: "PG",
-        metricDetails: {
-            service: "Database",
-            metric: "MEM"
-        }
+        service: "Database",
+        resource: "Memory",
+        product: "Quiver PLUS"
     },
     {
         dashboardName: "Memória_Apicação_WEB",
         // account: "PG",
-        metricDetails: {
-            service: "Application",
-            metric: "MEM"
-        }
+        service: "Application",
+        resource: "Memory",
+        product: "Quiver PLUS"
     },
     {
         dashboardName: "SQL_SERVER_-_CPU",
         // account: "SP",
-        metricDetails: {
-            service: "Database",
-            metric: "CPU"
-        }
+        service: "Database",
+        resource: "CPU",
+        product: "Quiver PRO"
     },
     {
         dashboardName: "Quiver_PRO",
         // account: "SP",
-        metricDetails: {
-            service: "Application",
-            metric: "CPU"
-        }
+        service: "Application",
+        resource: "CPU",
+        product: "Quiver PRO"
     },
     {
         dashboardName: "Memória_Banco_QuiverPRO",
         // account: "PG",
-        metricDetails: {
-            service: "Database",
-            metric: "MEM"
-        }
+        service: "Database",
+        resource: "Memory",
+        product: "Quiver PLUS"
     },
     {
         dashboardName: "Memória_AppQuiverPRO",
         // account: "PG",
-        metricDetails: {
-            service: "Application",
-            metric: "MEM"
-        }
+        service: "Application",
+        resource: "Memory",
+        product: "Quiver PLUS"
     }
 ]

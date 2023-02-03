@@ -1,74 +1,93 @@
-import { AWSMetrics } from "./handlers/AWSMetricsFileHandler";
+import { AWSMetricsReport } from "./handlers/AWSMetricsFileHandler";
 import { InstancesMetadataHelper } from "./handlers/InstancesMap";
 import { Queue } from "./handlers/Queue";
-import { Report } from "./handlers/Reports";
-import { AWSDetails } from "./shared/Types";
+import { AWSDetails, MetricDetails } from "./shared/Types";
 export class AWSMetricsController {
 
-    reportMetadata: AWSDetails | null = null
+    // Instances details
+    awsDetails?: AWSDetails;
+    metricDetails?: MetricDetails;
 
-    constructor() {
-        // check the queue
-        // IF THERE IS REPORT FILE TO PROCESS
-        // TODO ->  VERIFY INSTANCES MAP FILE
-    }
+    /**
+     * * Processing metric reports
+     *      For each csv report, 
+     *      AWS metadata is fetch and Metrics data formatted
+     * */ 
+    async processReportsOnFilesQueue() {
+        const metricsToProcess = await this.getMetricsFromFileQueue();
 
-    async generateReportsFromFilesOnQueue() {
-        const metricsToProcess = await this.getMetricsFromFileQueue()
-
-        metricsToProcess.forEach(
-            async metric => {
-                const metadata = await this.getMetricMetadata(metric)
-
-                if (metadata)
-                    metric.setInstancesDetails(metadata)
-                
-                console.log('END - Generating report from metric');
-                await new Report().buildExcel(metric);
+        const processedMetricsPromises = metricsToProcess.map(
+            async awsMetricsReport => {
+                if(!awsMetricsReport.metrics) 
+                    throw new Error(`There are no metrics`);
+                // 
+                return awsMetricsReport;
             }
         )
-    }
 
+        return await Promise.all(processedMetricsPromises.flat())
+    }
+    
+    // Await report hadler to feed metrics data
     private async getMetricsFromFileQueue() {
         console.log('1 - Getting metrics from files on queue\n');
 
         const filesFromQueue = await new Queue().filesToProcess()
 
-        const metricsFromFiles = filesFromQueue.map((file) => new AWSMetrics(file))
+        const metricsFromFiles = filesFromQueue.map((file) => new AWSMetricsReport(file))
 
-        return await Promise.all(metricsFromFiles.map(async metric =>  await metric.feedDataFromFile()))
-            .then(()=> metricsFromFiles)
+        const data = await Promise.all(metricsFromFiles.map(async awsMetricsReport =>  {
+            await awsMetricsReport.feedDataFromFile();
+
+            const awsInstancesMetadata = await this.feedMetadataFromFile( awsMetricsReport );
+            if (awsInstancesMetadata)
+                awsMetricsReport.setInstancesDetails(awsInstancesMetadata)
+
+            await awsMetricsReport.feedMetricsFromFile()
+
+        })).then(()=> metricsFromFiles)
+        
+        return data
     }
+    
+    // To improve metadata sharing through many reports processing, 
+     // * if there is a region change, metadadata is updated
+    private async feedMetadataFromFile(awsMetricsReport: AWSMetricsReport) {
+        console.log("Metadata verification for ", awsMetricsReport.region," region.")
 
-    private async getMetricMetadata(metric: AWSMetrics) {
-        console.log("Metadata verification for ", metric.region," region.")
+        const resource = awsMetricsReport.metricResource
+        const service = awsMetricsReport.metricService
+        
+        this.metricDetails = {
+            resource: resource,
+            service: service
+        }
 
-        if (!(this.reportMetadata?.region == metric.region)) {
-            this.reportMetadata = {
-                region: metric.region
+        if (!(this.awsDetails?.region == awsMetricsReport.region)) {
+            this.awsDetails = {
+                region: awsMetricsReport.region
             }
 
-            console.log("►► Metadata will be fetch for ", this.reportMetadata?.region, metric.region)
+            console.log("►► Metadata will be fetch for ", this.awsDetails?.region, awsMetricsReport.region)
 
             await this.feedInstanceDetailsMetadata();
         }
 
         console.log("Metadata is already updated")
-        return this.reportMetadata;
+        return this.awsDetails;
     }
 
     private async feedInstanceDetailsMetadata() {
         console.log("\n►►► Feeding metadata")
 
-        if (this.reportMetadata?.region) {
-            const metadata = new InstancesMetadataHelper(this.reportMetadata.region)
-            this.reportMetadata = await metadata.getMetadata()
+        if (this.awsDetails?.region) {
+            const metadata = new InstancesMetadataHelper(this.awsDetails)
+            const { instances } = await metadata.getMetadata()
 
-            console.log("> Metadata fed \n");
+            this.awsDetails.instances = instances
 
+            console.log(`> Metadata fed,\n`);
             return
-        }
-
-        console.error("Region is not defined ");
+        } console.error("Region is not defined ");
     }
 }

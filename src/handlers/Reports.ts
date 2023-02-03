@@ -1,6 +1,6 @@
 import fs from "fs";
 import XLSX from 'xlsx'
-import { AWSMetrics } from "./AWSMetricsFileHandler";
+import { AWSMetricsReport } from "./AWSMetricsFileHandler";
 export class Report {
     public srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
 
@@ -29,10 +29,9 @@ export class Report {
         this.workbook = workbook;
     }
 
-    public async buildExcel(reportFile: AWSMetrics, path = this.treatedDirPath) {
-        const metricsReportDetails = reportFile.identifyMetric(reportFile);
+    public async buildExcel(reportFile: AWSMetricsReport, path = this.treatedDirPath) {
         // TODO - Verify if is it created
-        const metricsByDay = await reportFile.metricsByDay()
+        const metricsByDay = reportFile.metricsByDay()
 
         let days = Object.keys(metricsByDay );
 

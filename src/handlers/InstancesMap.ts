@@ -1,13 +1,14 @@
 import fs from 'fs';
-import XLSX from 'xlsx';
 
-import AWS from 'aws-sdk'
-import { AWSDetails, InstanceDetails } from '../shared/Types';
+import { Credentials, EC2 } from 'aws-sdk'
+import { prisma } from '../service/prisma';
+
+import { AWSDetails } from '../shared/Types';
+import { Instance } from '../models/Instance';
+
 require('dotenv').config();
 
 export class InstancesMetadataHelper {
-
-    public metadata: AWSDetails;
 
     static projectDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
     private metadataDir: string = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/') + '/Metadata';
@@ -19,100 +20,99 @@ export class InstancesMetadataHelper {
     }
 
     constructor(
-        private region: string
-    ) {
-        this.metadata = { region: this.region };
-    }
+        private metadata: AWSDetails
+    ) {   }
 
-    setRegion(region: string) {
-        this.metadata.region = region;
-    }
+    async getMetadata(): Promise<AWSDetails> {
 
-    async getMetadata() {
-        // if(await this.regionInstancesAreMapped()) {
-        //     const metadataString = await fs.readFileSync(`${this.metadataDir}/${this.region}.json`, `utf-8`)
-        //     this.metadata = JSON.parse(metadataString)
-            
-        //     console.log("Parsed and applied metadata ");
+        this.metadata.instances = await this.getInstances();
 
-        // } else {
-            console.log(" !!! Não estão mepeados !!!");
-            await this.feedMetadata()
-        // }
+        if (!this.metadata.instances?.length) {
+            console.log('Fetching instances descriptions from AWS to map services instances...\n');
+            await this.feedInstancesData();
+
+            this.metadata.instances = await this.getInstances();
+        }
+
+        console.log("Instances are mapped");
+
         return this.metadata;
     }
 
-    private async feedMetadata() {
-        // Instances data 
-        this.ec2 = new AWS.EC2({
-            region: this.metadata.region,
-            credentials: new AWS.Credentials(this.credentials)
-        });
+    private async getInstances(): Promise<Instance[] | undefined> {
+        try {
+            const prismaInstances = await prisma.instances.findMany({
+                where: {
+                    region: {
+                        contains: this.metadata.region
+                    }
+                }
+            });    
 
-        console.log('Fetching instances descriptions from AWS to map services instances...\n');
+            return prismaInstances.map( instance => {
+                return new Instance().fromPrisma(instance)
+            } )       
+
+        } catch (error) {
+            console.log(error);
+        }        
+    }
+
+    private async feedInstancesData() {
+        // Instances data 
+        this.ec2 = new EC2({
+            region: this.metadata.region,
+            credentials: new Credentials(this.credentials)
+        });
 
         let ec2InstancesDescriptionPromise = this.ec2.describeInstances().promise();
 
-        return ec2InstancesDescriptionPromise.then( data => {
+        ec2InstancesDescriptionPromise.then(async instancesDescriptions => {
             console.log('Feeding instances\n');
-            this.metadata.instances = data.Reservations?.map(this.mapInstanceData).flat()
 
-            // Saving data
-            // this.saveInstancesToExcelFile();
-            this.saveInstancesToJSONFile();
-            return this.metadata;
-        } )
-    }
+            let persistencePromises: any = []
 
-    async regionInstancesAreMapped(): Promise<boolean> {
-        const data = await fs.readdirSync(this.metadataDir, 'utf-8')
+            instancesDescriptions.Reservations?.forEach(reservation => {
+                return this.convertAWSReservationsToInstances(reservation)?.forEach(
+                    instance => {
+                        persistencePromises.push(this.persistInstancesData(instance))
+                    }
+                )
+            });
 
-        console.log('Instances metadata saved: ', data, data.indexOf(this.region + '.json'), data.indexOf(this.region + '.xlsz'));
-
-        return data.indexOf(this.region + '.json') >= 0 || data.indexOf(this.region + '.xlsx') >= 0
-    }
-
-    private mapInstanceData(reservations: AWS.EC2.Reservation) {
-        return reservations.Instances?.map(({
-            InstanceId,
-            InstanceType,
-            KeyName,
-            Monitoring,
-            Placement,
-            Platform,
-            PrivateDnsName,
-            PrivateIpAddress,
-            PublicDnsName,
-            PublicIpAddress,
-            Tags,
-            PlatformDetails,
-            State
-        }) => {
-            return {
-                Produto: Tags?.find(tag => tag.Key == 'produto')?.Value || undefined,
-                Label: Tags?.find(tag => tag.Key == 'Name')?.Value || undefined,
-                State: State?.Name,
-                InstanceId,
-                InstanceType,
-                KeyName,
-                Monitoring: Monitoring?.State,
-                Region: Placement?.AvailabilityZone,
-                Platform,
-                PrivateDnsName,
-                PrivateIpAddress,
-                PublicDnsName,
-                PublicIpAddress,
-                Tags,
-                PlatformDetails,
-            }
+            return persistencePromises ? await Promise.all(persistencePromises) : undefined
         })
     }
 
+    private convertAWSReservationsToInstances(reservations: AWS.EC2.Reservation) {
+        if (reservations.Instances)
+            return reservations.Instances?.map(awsInstance => new Instance().fromAWS(awsInstance))
+
+    }
+
+    private async persistInstancesData(instance: Instance | undefined) {
+        if (instance) {
+            try {
+                const storedInstances = await prisma.instances.create({
+                    data: instance
+                })
+
+                return storedInstances
+
+            } catch (error) {
+                console.log(error)
+            }
+        }
+    }
+    
+    // ------------
+    // Save to file
+    // ------------
     private saveInstancesToJSONFile() {
         const parsedData = JSON.stringify(this.metadata, null, 2)
         console.log('Saving JSON file with instances!!\n', parsedData);
         fs.writeFile(
-            `${this.metadataDir}/${this.region}.json`,
+            `${this.metadataDir}/${this.metadata.region}.json`,
             parsedData, "utf-8",
             (err) => {
                 err ? console.log(err) : console.log("Data saves successfully!!\n")
@@ -120,43 +120,33 @@ export class InstancesMetadataHelper {
         )
     }
 
-    private saveInstancesToExcelFile() {
-        const data = this.metadata.instances ? this.metadata.instances?.map(instance => {
-            return {
-                Produto: instance?.Produto,
-                Label: instance?.Label,
-                Id: instance?.InstanceId,
-                KeyName: instance?.KeyName,
-                InstanceType: instance?.InstanceType,
-            }
-        }) : []
+    // private saveInstancesToExcelFile() {
+    //     const data = this.metadata.instances ? this.metadata.instances?.map(instance => {
+    //         return {
+    //             Produto: instance?.Produto,
+    //             Label: instance?.Label,
+    //             Id: instance?.InstanceId,
+    //             KeyName: instance?.KeyName,
+    //             InstanceType: instance?.InstanceType,
+    //         }
+    //     }) : []
 
-        const worksheet = XLSX.utils.json_to_sheet(data);
+    //     const worksheet = XLSX.utils.json_to_sheet(data);
 
-        const fileName = `${this.metadataDir}/${this.region}.xlsx`
+    //     const fileName = `${this.metadataDir}/${this.region}.xlsx`
 
-        const workbook = XLSX.utils.book_new();
+    //     const workbook = XLSX.utils.book_new();
 
-        var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
+    //     var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
 
-        XLSX.utils.book_append_sheet(workbook, worksheet, this.region);
+    //     XLSX.utils.book_append_sheet(workbook, worksheet, this.region);
 
-        console.log('Saving XLSX file with instances!!\n');
-        XLSX.writeFileXLSX(
-            workbook,
-            fileName,
-            wopts
-        );
-    }
-
-    /**
-     * -----------------------------
-     * Usable instances arrayfilters 
-     * -----------------------------
-     * */
-
-    static instanceLabelOrProductContains = (
-        instance: InstanceDetails | undefined, name: string
-    ) => !!(instance?.Produto?.toLowerCase().includes(name) || instance?.Label?.toLowerCase().includes(name))
+    //     console.log('Saving XLSX file with instances!!\n');
+    //     XLSX.writeFileXLSX(
+    //         workbook,
+    //         fileName,
+    //         wopts
+    //     );
+    // }
 
 }

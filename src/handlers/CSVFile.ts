@@ -26,6 +26,10 @@ export class CSVFile {
         return this.data.split('\n');
     }
 
+    get rawContentArray() {
+        return this.rawDataArray.slice(this.headerEndLine, this.rawDataArray.length);
+    }
+
     static groupBy = (key: any) => (array: any) =>
         array.reduce(
             (objectsByKeyValue: { [x: string]: any; }, obj: { [x: string]: string | number; }) => ({
