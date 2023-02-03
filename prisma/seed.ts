@@ -10,7 +10,7 @@ metricsByDashboardName.forEach(async ({ dashboardName, service, resource, produc
         }
     })
 
-    if (!existingRecord) {
+    if (!existingRecord && product && service && resource) {
         // To match Enum class
         const formattedProduct: QuiverProducts = product.replace(' ','_') as QuiverProducts;
 

@@ -3,46 +3,29 @@ import { CSVFile } from "./CSVFile";
 import { metricsByDashboardName } from "../Metadata/MetricsByDashboardName";
 import { Metric } from "../models/Metric";
 
-interface InstanceData {
-    [instance: string]: number 
-}
-interface FormattedData {
-    date: string
-    hour: number
-    day: number
-    metrics?: [
-        {
-            [key: string]: InstanceData[]
-        }
-    ]
-}
-
 /**
  * Handle AWS metrics CSV report 
  * */
-export class AWSMetrics extends CSVFile {
+export class AWSMetricsReport extends CSVFile {
 
     headerEndLine = 4;
-    metadata: AWSDetails | null = null;
 
-    metrics?: (Metric | undefined)[]
+    metadata: AWSDetails | null = null;
+    metrics: Metric[] = []
 
     constructor(filename: string) {
         super(filename);
     }
 
-    get dashboardFromFilename() {
-        return this.fileName.split('-')[0]
-    }
-
     async feedMetricsFromFile() {
+
         const data = await Promise.all(
             this.rawContentArray.map(async (row, line) => {
                 if (line == 0) return // Skip header                
 
-                let metricsFromCSVRow = Array.from({ length: this.header.length-1 }, () => {                     
+                let metricsFromCSVRow = Array.from({ length: this.header.length - 1 }, () => {
                     let metric = new Metric();
-                    
+
                     // Feed metric metadata
                     const dateStringFromRow = row.split(',')[0];
                     metric.date = new Date(dateStringFromRow);
@@ -55,26 +38,29 @@ export class AWSMetrics extends CSVFile {
                 this.header.forEach(async (head, idx) => {
                     if (idx == 0) return
 
-                    metricsFromCSVRow[idx-1].maximumUsage = Number(Number(row.split(',')[idx]).toFixed(2))
+                    metricsFromCSVRow[idx - 1].maximumUsage = Number(Number(row.split(',')[idx]).toFixed(2))
 
                     const instance = await this.instanceFromId(head);
-                    if(instance) metricsFromCSVRow[idx-1].instance = instance
+                    if (instance) metricsFromCSVRow[idx - 1].instance = instance
                 });
 
                 return await Promise.all(metricsFromCSVRow).then((result) => result)
             })
-        ).then((result) => result.flat())
+        ).then((result) => result.flat().filter(data => !!data))
 
-        if(data)
-            this.metrics = data
+        data.forEach(data => data != undefined ? this.metrics.push(data) : null)
 
-        console.log("Formatted data from promise", this.metrics, "\n");
+        console.log("Formatted data from promise\n");
 
         return {
             metadata: this.metadata,
             header: this.header,
-            metrics: data
+            metrics: this.metrics
         }
+    }
+
+    setInstancesDetails(instancesDetails: AWSDetails) {
+        this.metadata = instancesDetails;
     }
 
     //* Getters returning treated data from CSV
@@ -113,113 +99,75 @@ export class AWSMetrics extends CSVFile {
     }
 
     get metricResource() {
-        return metricsByDashboardName.find( ({ dashboardName }) => this.dashboardFromFilename == dashboardName )?.resource
-        
+        return this.dashboardMetadataFromFilename?.resource
+
     }
 
     get metricService() {
-        return metricsByDashboardName.find( ({ dashboardName }) => this.dashboardFromFilename == dashboardName )?.service
-        
+        return this.dashboardMetadataFromFilename?.service
+
     }
 
     get metricProduct() {
-        return metricsByDashboardName.find( ({ dashboardName }) => this.dashboardFromFilename == dashboardName )?.product
-        
+        return this.dashboardMetadataFromFilename?.product
+
     }
 
-    get rawContentArray() {
-        return this.rawDataArray.slice(this.headerEndLine, this.rawDataArray.length);
+    private get dashboardMetadataFromFilename() {
+        const dashboardNameFromFilename = this.fileName.split('-')[0]
 
+        // TODO - Improve null verification
+        const dash: DashboardMetadata = {
+            dashboardName: dashboardNameFromFilename,
+        }
+        return metricsByDashboardName.find(({ dashboardName }) => dashboardNameFromFilename == dashboardName) || dash
+    }
+
+    // Filtering business period - weekdays, from 08h to 21h
+    getMetricsOnValidPeriod(): Metric[] {
+        let acumulator: {
+            notBusinessDay: Metric[], notBusinessHour: Metric[], businessValidPeriod: Metric[]
+        }
+
+        const getMetricsOnValidPeriod = this.metrics.reduce((acc: typeof acumulator, metric) => {
+            if (!metric) return acc
+            if (!metric.isBusinessDay) {
+                acc.notBusinessDay.push(metric);
+            } else if (!metric.isBusinessHour) {
+                acc.notBusinessHour.push(metric);
+            } else {
+                acc.businessValidPeriod.push(metric);
+            }
+            return acc;
+        }, { notBusinessDay: [], notBusinessHour: [], businessValidPeriod: [] });
+
+        console.table(Object.keys(getMetricsOnValidPeriod).map((key) => {
+            if ((key == "notBusinessDay" || key == "notBusinessHour" || key == "businessValidPeriod"))
+                return { key, items: getMetricsOnValidPeriod[key].length }
+        }))
+        return getMetricsOnValidPeriod.businessValidPeriod
     }
 
     async metricsByDay() {
         let groupByDay = CSVFile.groupBy('date');
-        const formattedData = await this.formattedData()
-        // console.log("Data to be grouped ",formattedData);
-        let metricsGroupedByDay = groupByDay(formattedData);
+        const metricsGroupedByDay = groupByDay(this.metrics);
+        console.log("Data to be grouped ", metricsGroupedByDay);
+
         let metricsByDayFiltered: { [key: string]: object[] } = {}
 
         let days = Object.keys(metricsGroupedByDay);
 
         days.forEach(day => {
-            if (this.isBusinessDay(new Date(day))) {
-                metricsByDayFiltered[day] = []
+            metricsByDayFiltered[day] = []
 
-                metricsByDayFiltered[day]
-                    .push(...metricsGroupedByDay[day].filter( (metric: FormattedData) => this.isBusinessHour(metric.hour)));
-            }
+            metricsByDayFiltered[day]
+                .push(...metricsGroupedByDay[day].filter((metric: Metric) => metric.isBusinessHour));
         })
-
-        // console.log('metricsByDayFiltered ', metricsByDayFiltered);
-        
-
         return metricsByDayFiltered
     }
 
-    private treatDayProp(day: string) {
-        let padStart = day.split('/').map((number, idx) => idx <= 1 ? number.padStart(2, '0') : number)
-        return [padStart[1], padStart[0], padStart[2]].join(' ');
-    }
-
-    async formattedData() {
-        const data = await Promise.all(
-            this.rawContentArray.map(async (row, line) => {
-                if (line == 0) return // Skip header                
-
-                let metricsFromCSVRow = Array.from({ length: this.header.length-1 }, () => {                     
-                    let metric = new Metric();
-                    
-                    const dateStringFromRow = row.split(',')[0];
-                    metric.date = new Date(dateStringFromRow);
-                    metric.resource = this.metricResource
-                    metric.service = this.metricService
-
-                    console.log("Resource and service", this.metricResource, this.metricService)                   
-
-                    return metric
-                });
-
-                this.header.forEach(async (head, idx) => {
-                    if (idx == 0) return
-
-                    metricsFromCSVRow[idx-1].maximumUsage = Number(Number(row.split(',')[idx]).toFixed(2))
-
-                    const instance = await this.instanceFromId(head);
-                    if(instance) metricsFromCSVRow[idx-1].instance = instance
-                });
-
-                return await Promise.all(metricsFromCSVRow).then((result) => result)
-            })
-        ).then((result) => result)
-
-        console.log("Formatted data from promise", data, "\n");
-        
-        return data;
-    }
-
-    // TODO - UPDATE INSTANCES IDS MAPPING
     private instanceFromId(instanceId: string) {
         return this.metadata?.instances?.find(instance => instance?.instanceId == instanceId);
 
-    }
-
-    private isBusinessDay(day: Date): boolean {
-        const weekendDays = [0, 6];
-        return !weekendDays.includes(day.getDay());
-    }
-
-    private isBusinessHour(hour: number): boolean {
-        const businessHour = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
-        return businessHour.includes(hour);
-    }
-
-    setInstancesDetails(instancesDetails: AWSDetails) {
-        this.metadata = instancesDetails;
-    }
-
-    // TODO - Call on setInstancesDetails to get account, 
-    identifyMetric(reportFile: AWSMetrics): DashboardMetadata | void {
-        return metricsByDashboardName
-            .find((metricDetails)=> metricDetails.dashboardName == reportFile.dashboardFromFilename) || console.log("There's no report to this dashboard")
     }
 }

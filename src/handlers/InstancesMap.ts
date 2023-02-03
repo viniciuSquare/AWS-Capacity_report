@@ -23,7 +23,7 @@ export class InstancesMetadataHelper {
         private metadata: AWSDetails
     ) {   }
 
-    async getMetadata() {
+    async getMetadata(): Promise<AWSDetails> {
 
         this.metadata.instances = await this.getInstances();
 
@@ -39,7 +39,7 @@ export class InstancesMetadataHelper {
         return this.metadata;
     }
 
-    private async getInstances() {
+    private async getInstances(): Promise<Instance[] | undefined> {
         try {
             const prismaInstances = await prisma.instances.findMany({
                 where: {
@@ -67,7 +67,7 @@ export class InstancesMetadataHelper {
 
         let ec2InstancesDescriptionPromise = this.ec2.describeInstances().promise();
 
-        return ec2InstancesDescriptionPromise.then(async instancesDescriptions => {
+        ec2InstancesDescriptionPromise.then(async instancesDescriptions => {
             console.log('Feeding instances\n');
 
             let persistencePromises: any = []

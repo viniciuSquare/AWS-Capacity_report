@@ -1,13 +1,12 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "../service/prisma";
 import { Instance } from "./Instance";
 
 export class Metric {
-    id?          : number
-    instance?    : Instance;
-    date?        : Date
-    resource?    : "CPU" | "Memory"
-    service?     : "Application" | "Database"
+    id?: number
+    instance?: Instance;
+    date?: Date
+    resource?: "CPU" | "Memory"
+    service?: "Application" | "Database"
     maximumUsage?: number
 
     get day() {
@@ -18,34 +17,50 @@ export class Metric {
         return this.date?.getHours()
     }
 
-    async storeTransaction(transaction: Prisma.TransactionClient) {
-        if(this.instance?.id && this.maximumUsage && this.resource && this.service && this.date) {
-            const storedMetric = await transaction.metrics.create({
-                data: {
-                    id: this.id,
-                    date:this.date,
-                    instanceId: this.instance?.id,
-                    maximumUsage: this.maximumUsage,
-                    resource: this.resource,
-                    service: this.service,
-                }
-            })
-    
-            return storedMetric
-        }
-    }
-
-    // Verify unique metric before store
-    async safeStore() {
-        const store = this.storeTransaction.bind(this)
+    async store() {
         try {
+            if (this.instance?.id && this.resource && this.service && this.date) {
+                const duplication = await prisma.metrics.findFirst({
+                    where: {
+                        date: this.date,
+                        instanceId: this.instance.id,
+                        maximumUsage: this.maximumUsage || 0,
+                        resource: this.resource,
+                        service: this.service
+                    }
+                })
 
-            await store
+                if (duplication) {
+                    await prisma.$disconnect()
+                    console.log("Duplicated ", duplication);
 
-            console.log("\n\nIncomplete data!! \n\n")
+                    return
+                }
 
-        } catch (error) {
-            console.log(error)
+                const storedMetric = await prisma.metrics.create({
+                    data: {
+                        id: this.id,
+                        date: this.date,
+                        instanceId: this.instance?.id,
+                        maximumUsage: this.maximumUsage || 0,
+                        resource: this.resource,
+                        service: this.service,
+                    }
+                })
+
+                await prisma.$disconnect();
+                return storedMetric
+            }
+            throw new Error(`\nIncomplete data!!\t ${this.instance?.id} ${this.maximumUsage} ${this.resource} ${this.service} ${this.date}`)
+
+        } catch (error: any) {
+            if (error?.message?.includes("unique constraint")) {
+                console.error("Unique constraint error:", error.message);
+                // rollback the transaction and continue
+            } else {
+                console.error("Deu ruim", error)
+                throw error;
+            }
         }
 
     }

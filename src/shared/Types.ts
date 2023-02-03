@@ -2,7 +2,7 @@ import { Instance } from "../models/Instance"
 
 export interface DashboardMetadata {
     dashboardName: string,
-    product: "Quiver PRO" | "Quiver PLUS"
+    product?: "Quiver PRO" | "Quiver PLUS"
     service?: "Application" | "Database",
     resource?: "CPU" | "Memory",
 }
