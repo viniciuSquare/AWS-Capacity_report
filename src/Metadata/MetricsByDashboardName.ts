@@ -1,5 +1,6 @@
 import { DashboardMetadata } from "../shared/Types";
 
+// Dashboards metrics will be feed with this metadata
 export const metricsByDashboardName: DashboardMetadata[] = [
     {
         dashboardName: "CPUUtilization_-_SQL_WWW",
@@ -48,13 +49,13 @@ export const metricsByDashboardName: DashboardMetadata[] = [
         // account: "PG",
         service: "Database",
         resource: "Memory",
-        product: "Quiver PLUS"
+        product: "Quiver PRO"
     },
     {
         dashboardName: "Memória_AppQuiverPRO",
         // account: "PG",
         service: "Application",
         resource: "Memory",
-        product: "Quiver PLUS"
+        product: "Quiver PRO"
     }
 ]

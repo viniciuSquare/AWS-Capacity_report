@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon",
-    "service": "nodemon src/AWS.service.ts"
+    "service": "nodemon src/service/AWS.service.ts"
   },
   "keywords": [],
   "author": "",

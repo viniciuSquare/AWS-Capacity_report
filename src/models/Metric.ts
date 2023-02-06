@@ -17,6 +17,10 @@ export class Metric {
         return this.date?.getHours()
     }
 
+    get monthDate() {
+        return this.date?.getDate()
+    }
+
     async store() {
         try {
             if (this.instance?.id && this.resource && this.service && this.date) {

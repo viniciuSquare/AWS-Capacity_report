@@ -1,21 +1,23 @@
 import { AWSMetricsController } from "./AWSMetricsReportController";
-import { AWSMetricsReport } from "./handlers/AWSMetricsFileHandler";
-import { Metric } from "./models/Metric";
-import { MetricService } from "./service/MetricService";
+import { MetricsDatabaseService } from "./service/MetricsDatabaseService";
+import { MetricsXLSXReportService } from "./service/MetricsXSLXReportService";
 
 async function main() {
-    const awsMetricsProcessedReports = await new AWSMetricsController().processReportsOnFilesQueue()
+    const awsMetricsProcessedReports = await new AWSMetricsController().awsReportsFromQueue()
 
     awsMetricsProcessedReports.forEach( metricReport => {
 
         console.log(metricReport.metrics?.length);
 
         if (metricReport.metrics) {
-            const metricsService = new MetricService()
-            const metrics = metricsService.getMetricsOnValidPeriod(metricReport.metrics);
+            // const metrics = metricReport.getMetricsOnValidPeriod();
+
+            const metricsDatabaseService = new MetricsDatabaseService()
+            const metricsReportService = new MetricsXLSXReportService( metricReport );
+            metricsReportService.buildExcel()
             
             // * Save to database
-            // metricsService.saveMetrics(metrics);
+            // metricsDatabaseService.saveMetrics(metrics);
         }
 
         // metricReport.metricsByDay();
@@ -25,6 +27,6 @@ async function main() {
 }
 
 // * Generate XLSX report
-// await new Report().buildExcel(awsMetricsReports);
+// await new MetricsXLSXReportService().buildExcel(AWSReportHandlers);
 
 main()

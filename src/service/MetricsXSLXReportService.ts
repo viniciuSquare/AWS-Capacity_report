@@ -1,15 +1,20 @@
 import fs from "fs";
 import XLSX from 'xlsx'
-import { AWSMetricsReport } from "./AWSMetricsFileHandler";
-export class Report {
+import { AWSMetricsFileHandler } from "../handlers/AWSMetricsFileHandler";
+import { CSVFile } from "../handlers/CSVFile";
+import { Metric } from "../models/Metric";
+
+export class MetricsXLSXReportService {
     public srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
 
     private treatedDirPath = this.srcCodeBaseDir + "/Treated";    
 
     public workbook: XLSX.WorkBook;
+    public metrics: Metric[] = [];
 
-    constructor() {
+    constructor( private report: AWSMetricsFileHandler) {
         this.workbook = XLSX.utils.book_new();
+        this.metrics = report.getMetricsOnValidPeriod();
 
         this.checkStructureIntegrity();
     }
@@ -25,22 +30,24 @@ export class Report {
 
     isStructureCreated = (sourceDirPathList: string[]) => (sourceDirPathList.filter(dir => ( dir == 'Raw' || dir == 'Treated' )))
 
+    // ------------------------------> <------------------------------
+    
     setWorkbook(workbook: XLSX.WorkBook) {
         this.workbook = workbook;
     }
 
-    public async buildExcel(reportFile: AWSMetricsReport, path = this.treatedDirPath) {
+    public async buildExcel(path = this.treatedDirPath) {
         // TODO - Verify if is it created
-        const metricsByDay = reportFile.metricsByDay()
+        const metricsByDay = await this.metricsByDay()
 
-        let days = Object.keys(metricsByDay );
+        let days = Object.keys( metricsByDay );
 
-        console.log("days ", metricsByDay);
+        console.log("days ", metricsByDay, days);
 
         const worksheets = days.map( async day => {
-            const metricByDay = await reportFile.metricsByDay();
+            const metricByDay = await this.metricsByDay();
             const worksheet = this.creteWorkbook(metricByDay[day])
-            // console.log(reportFile.metricsByDay());
+            // console.log(this.metricsByDay());
             return { day, worksheet }
         }) 
 
@@ -54,12 +61,30 @@ export class Report {
     
             XLSX.writeFileXLSX(
                 this.workbook,
-                `${path}/${reportFile.fileName}.xlsx`,
+                `${path}/${this.report.dashboardMetadataFromFilename.dashboardName}.xlsx`,
                 wopts
             );
         })
 
 
+    }
+
+    metricsByDay() {
+        let groupByDay = CSVFile.groupBy('monthDate');
+        const metricsGroupedByDay = groupByDay(this.metrics);
+
+        let metricsByDayFiltered: { [key: string]: object[] } = {}
+
+        let days = Object.keys(metricsGroupedByDay);
+        console.log(days)
+
+        days.forEach(day => {
+            metricsByDayFiltered[day] = []
+
+            metricsByDayFiltered[day]
+                .push(...metricsGroupedByDay[day].filter((metric: Metric) => metric.isBusinessHour));
+        })
+        return metricsByDayFiltered
     }
 
     creteWorkbook(jsonData: object[]) {

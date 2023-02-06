@@ -7,7 +7,7 @@
 [] Persist instances with metric creation
     [] Update instance product from dashboard metadata - data fetch from AWS doesn't have this property fed.
 [] **Model's Prisma service**
-    There is a "service" which builds the daily reports in xlsx, the `Report` 
+    There is a "service" which builds the daily reports in xlsx, the `MetricsXLSXReportService` 
 
 
 ### Readme
@@ -15,3 +15,4 @@
     - **Comment highlight** - change color of commented lines with *\* | todo*
         ``//* Getters returning treated data from CSV``
         ``//todo - Getters returning treated data from CSV``
+

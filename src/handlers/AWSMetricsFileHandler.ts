@@ -6,7 +6,7 @@ import { Metric } from "../models/Metric";
 /**
  * Handle AWS metrics CSV report 
  * */
-export class AWSMetricsReport extends CSVFile {
+export class AWSMetricsFileHandler extends CSVFile {
 
     headerEndLine = 4;
 
@@ -23,28 +23,24 @@ export class AWSMetricsReport extends CSVFile {
             this.rawContentArray.map(async (row, line) => {
                 if (line == 0) return // Skip header                
 
-                let metricsFromCSVRow = Array.from({ length: this.header.length - 1 }, () => {
+                let metricsFromCSVRow = Array.from({ length: this.header.length - 1 }, async (_, idx) => {
+                    const instancesHeaderValidIndex = idx+1;
                     let metric = new Metric();
 
                     // Feed metric metadata
                     const dateStringFromRow = row.split(',')[0];
                     metric.date = new Date(dateStringFromRow);
                     metric.resource = this.metricResource
-                    metric.service = this.metricService
+                    metric.service = this.MetricsDatabaseService
+                    metric.maximumUsage = Number(Number(row.split(',')[instancesHeaderValidIndex]).toFixed(2))
+
+                    const instance = await this.instanceFromId(this.header[instancesHeaderValidIndex]);
+                    if (instance) metric.instance = instance
 
                     return metric
                 });
 
-                this.header.forEach(async (head, idx) => {
-                    if (idx == 0) return
-
-                    metricsFromCSVRow[idx - 1].maximumUsage = Number(Number(row.split(',')[idx]).toFixed(2))
-
-                    const instance = await this.instanceFromId(head);
-                    if (instance) metricsFromCSVRow[idx - 1].instance = instance
-                });
-
-                return await Promise.all(metricsFromCSVRow).then((result) => result)
+                return await Promise.all(metricsFromCSVRow);
             })
         ).then((result) => result.flat().filter(data => !!data))
 
@@ -103,7 +99,7 @@ export class AWSMetricsReport extends CSVFile {
 
     }
 
-    get metricService() {
+    get MetricsDatabaseService() {
         return this.dashboardMetadataFromFilename?.service
 
     }
@@ -113,7 +109,7 @@ export class AWSMetricsReport extends CSVFile {
 
     }
 
-    private get dashboardMetadataFromFilename() {
+    get dashboardMetadataFromFilename() {
         const dashboardNameFromFilename = this.fileName.split('-')[0]
 
         // TODO - Improve null verification
@@ -126,44 +122,26 @@ export class AWSMetricsReport extends CSVFile {
     // Filtering business period - weekdays, from 08h to 21h
     getMetricsOnValidPeriod(): Metric[] {
         let acumulator: {
-            notBusinessDay: Metric[], notBusinessHour: Metric[], businessValidPeriod: Metric[]
+            notBusinessDay: Metric[], notBusinessHour: Metric[], validPeriod: Metric[]
         }
 
-        const getMetricsOnValidPeriod = this.metrics.reduce((acc: typeof acumulator, metric) => {
+        const businessPeriodValidation = this.metrics.reduce((acc: typeof acumulator, metric) => {
             if (!metric) return acc
             if (!metric.isBusinessDay) {
                 acc.notBusinessDay.push(metric);
             } else if (!metric.isBusinessHour) {
                 acc.notBusinessHour.push(metric);
             } else {
-                acc.businessValidPeriod.push(metric);
+                acc.validPeriod.push(metric);
             }
             return acc;
-        }, { notBusinessDay: [], notBusinessHour: [], businessValidPeriod: [] });
+        }, { notBusinessDay: [], notBusinessHour: [], validPeriod: [] });
 
-        console.table(Object.keys(getMetricsOnValidPeriod).map((key) => {
-            if ((key == "notBusinessDay" || key == "notBusinessHour" || key == "businessValidPeriod"))
-                return { key, items: getMetricsOnValidPeriod[key].length }
+        console.table(Object.keys(businessPeriodValidation).map((key) => {
+            if ((key == "notBusinessDay" || key == "notBusinessHour" || key == "validPeriod"))
+                return { key, items: businessPeriodValidation[key].length }
         }))
-        return getMetricsOnValidPeriod.businessValidPeriod
-    }
-
-    async metricsByDay() {
-        let groupByDay = CSVFile.groupBy('date');
-        const metricsGroupedByDay = groupByDay(this.metrics);
-        console.log("Data to be grouped ", metricsGroupedByDay);
-
-        let metricsByDayFiltered: { [key: string]: object[] } = {}
-
-        let days = Object.keys(metricsGroupedByDay);
-
-        days.forEach(day => {
-            metricsByDayFiltered[day] = []
-
-            metricsByDayFiltered[day]
-                .push(...metricsGroupedByDay[day].filter((metric: Metric) => metric.isBusinessHour));
-        })
-        return metricsByDayFiltered
+        return businessPeriodValidation.validPeriod
     }
 
     private instanceFromId(instanceId: string) {

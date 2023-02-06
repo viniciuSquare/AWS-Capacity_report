@@ -1,30 +1,31 @@
-import { AWSMetricsReport } from "./handlers/AWSMetricsFileHandler";
+import { AWSMetricsFileHandler } from "./handlers/AWSMetricsFileHandler";
 import { InstancesMetadataHelper } from "./handlers/InstancesMap";
 import { Queue } from "./handlers/Queue";
 import { AWSDetails, MetricDetails } from "./shared/Types";
+
+/**
+ * * Processing metric reports, for each csv report
+ * 
+ *  `AWSMetricsFileHandler` process metadata and Metrics data is formatted
+ * */ 
 export class AWSMetricsController {
 
     // Instances details
     awsDetails?: AWSDetails;
     metricDetails?: MetricDetails;
 
-    /**
-     * * Processing metric reports
-     *      For each csv report, 
-     *      AWS metadata is fetch and Metrics data formatted
-     * */ 
-    async processReportsOnFilesQueue() {
+    // AWS reports with data ready
+    async awsReportsFromQueue(): Promise<AWSMetricsFileHandler[]> {
         const metricsToProcess = await this.getMetricsFromFileQueue();
 
         const processedMetricsPromises = metricsToProcess.map(
-            async awsMetricsReport => {
-                if(!awsMetricsReport.metrics) 
+            async AWSMetricsFileHandler => {
+                if(!AWSMetricsFileHandler.metrics) 
                     throw new Error(`There are no metrics`);
-                // 
-                return awsMetricsReport;
+
+                return AWSMetricsFileHandler;
             }
         )
-
         return await Promise.all(processedMetricsPromises.flat())
     }
     
@@ -34,16 +35,16 @@ export class AWSMetricsController {
 
         const filesFromQueue = await new Queue().filesToProcess()
 
-        const metricsFromFiles = filesFromQueue.map((file) => new AWSMetricsReport(file))
+        const metricsFromFiles = filesFromQueue.map((file) => new AWSMetricsFileHandler(file))
 
-        const data = await Promise.all(metricsFromFiles.map(async awsMetricsReport =>  {
-            await awsMetricsReport.feedDataFromFile();
+        const data = await Promise.all(metricsFromFiles.map(async awsReportHandler =>  {
+            await awsReportHandler.feedDataFromFile();
 
-            const awsInstancesMetadata = await this.feedMetadataFromFile( awsMetricsReport );
+            const awsInstancesMetadata = await this.feedMetadataFromFile( awsReportHandler );
             if (awsInstancesMetadata)
-                awsMetricsReport.setInstancesDetails(awsInstancesMetadata)
+                awsReportHandler.setInstancesDetails(awsInstancesMetadata)
 
-            await awsMetricsReport.feedMetricsFromFile()
+            await awsReportHandler.feedMetricsFromFile()
 
         })).then(()=> metricsFromFiles)
         
@@ -52,23 +53,23 @@ export class AWSMetricsController {
     
     // To improve metadata sharing through many reports processing, 
      // * if there is a region change, metadadata is updated
-    private async feedMetadataFromFile(awsMetricsReport: AWSMetricsReport) {
-        console.log("Metadata verification for ", awsMetricsReport.region," region.")
+    private async feedMetadataFromFile(awsReportHandler: AWSMetricsFileHandler) {
+        console.log("Metadata verification for ", awsReportHandler.region," region.")
 
-        const resource = awsMetricsReport.metricResource
-        const service = awsMetricsReport.metricService
+        const resource = awsReportHandler.metricResource
+        const service = awsReportHandler.MetricsDatabaseService
         
         this.metricDetails = {
             resource: resource,
             service: service
         }
 
-        if (!(this.awsDetails?.region == awsMetricsReport.region)) {
+        if (!(this.awsDetails?.region == awsReportHandler.region)) {
             this.awsDetails = {
-                region: awsMetricsReport.region
+                region: awsReportHandler.region
             }
 
-            console.log("►► Metadata will be fetch for ", this.awsDetails?.region, awsMetricsReport.region)
+            console.log("►► Metadata will be fetch for ", this.awsDetails?.region, awsReportHandler.region)
 
             await this.feedInstanceDetailsMetadata();
         }

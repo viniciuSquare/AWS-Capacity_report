@@ -1,7 +1,7 @@
 import { Metric } from "../models/Metric";
 import { prisma } from "./prisma";
 
-export class MetricService {
+export class MetricsDatabaseService {
   private prisma = prisma;
 
   async saveMetrics(metrics: Metric[]) {

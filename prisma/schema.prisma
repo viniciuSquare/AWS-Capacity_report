@@ -17,7 +17,7 @@ datasource db {
 model Metrics {
   id           Int            @id @default(autoincrement())
   resource     MetricResource
-  service      MetricService
+  service      MetricsDatabaseService
   instanceId   Int
   maximumUsage Float
   date         DateTime
@@ -27,7 +27,7 @@ model Metrics {
   @@unique([resource, service, instanceId, date])
 }
 
-enum MetricService {
+enum MetricsDatabaseService {
   Application
   Database
 }
@@ -62,7 +62,7 @@ model Instances {
 model AWSDashboardDetails {
   id            Int            @id @default(autoincrement())
   dashboardName String
-  service       MetricService
+  service       MetricsDatabaseService
   resource      MetricResource
   product       QuiverProducts
 

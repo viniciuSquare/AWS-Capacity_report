@@ -39,36 +39,35 @@ Data from CSV file is treated, filtered by business work time and grouped by day
 Change logs bellow is an overview to development workflow changes so far.
 
 ## Change Logs
-
 ---
-#### **→ 27 Jan 2023**
--  Created `readme.md` with project details and **change logs**.
-#### **→ 26 Jan 2023**
--  Improving data structures, isolating types.
--  Mapped dashboards name and its specificities.
--  Fixed instance metadata handling.
-#### **→ 25 Jan 2023**
-Async data was fixed, improving formatted data and  data structures.
-To fix some technical debts from data fetching Promises.
--  Creating remote repository
-#### **→ 23 Jan 2023**
+#### **→ 06 - 11 Feb 2023**
+#### **→ 30 Jan - 03 Feb 2023**
+- Refactoring, the AWSMetricsFileHandler, csv handler, maps all data then services will be able to handle it.
+- Persisting data on database - Metrics & Instances
+- Updating structures - database models, data types, services & handlers.
+   - Updating docs
+
+#### **→ 23 - 27 Jan 2023**
 Created **AWS Metrics Report Controller** which basically is instantiated by main script and runs the workflows:
 → Map metrics from files on queue and generate reports from grouped data   - Created `InstancesMetadataHelper` → Attempts to fetch AWS instances details with AWS SDK because instances IDs on CSV files don't match with XLSX .
-- Improving async calls on workflow, so metrics data can be mapped with instances label. Some issues dealing async calls on dataflow
+- Async data was fixed, improving formatted data and  data structures.
+   -  Fixed instance metadata handling.
+   To fix some technical debts from data fetching Promises.
+-  Mapped dashboards name and its specificities.
+-  Improving data structures, isolating types.
+-  Creating remote repository
+-  Improving async calls on workflow, so metrics data can be mapped with instances label. Some issues dealing async calls on dataflow
 
-
+-  Created `readme.md` with project details and **change logs**.
 - `AWSFileHandler` → Improved getters to header, region and content from raw data.
-#### **→ 20 Jan 2023**
-Refactoring structures to isolate responsibilities. Treating async calls errors and types conflicts.
--  Created **Classes diagram** and **Data structures** to ease visualization.
-#### **→ 18 Jan 2023**
-Some CSV file handling was abstracted and `MetricsCSVFile` is `AWSFileHandler`, handling data and formatting day props. Improved methods of typing.
+#### **→ 16 - 20 Jan 2023**
+- Converting code to typescript usage to use type hints and study more about its usage.
+   - Create `Queue` & `Report` handlers, and `MetricsCSVFile` to read, process and return formatted data.
+   - Converted elements to a rough class, intend to clean **process work** from **data structures.** Having trouble with async requests to read raw CSV reports. When `Metric` is passed to report generation, it still doesn’t have data to be formatted.
+- Some CSV file handling was abstracted and `MetricsCSVFile` is `AWSFileHandler`, handling data and formatting day props. Improved methods of typing.
+
 - Attempts to fetch AWS metrics details with AWS SDK
-
-
 - Working on AWS instances metadata getter. It will be used to identify metric specificity. Attempting to map instances from the XLSM report given.
-#### **→ 17 Jan 2023**
-Converted elements to a rough class, intend to clean **process work** from **data structures.** Having trouble with async requests to read raw CSV reports. When `Metric` is passed to report generation, it still doesn’t have data to be formatted.
-#### **→ 16 Jan 2023**
-Converting code to typescript usage to use type hints and study more about its usage.
-Create `Queue` & `Report` handlers, and `MetricsCSVFile` to read, process and return formatted data.
+
+- Refactoring structures to isolate responsibilities. Treating async calls errors and types conflicts.
+   - Created **Classes diagram** and **Data structures** to ease visualization.
