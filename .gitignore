@@ -6,5 +6,7 @@ src/Cleaned/*
 src/Treated/*
 *.xlsx
 *.csv
+src/Metadata/PRO/*
+src/Metadata/PLUS/*
 
 .env
