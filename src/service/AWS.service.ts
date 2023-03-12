@@ -1,118 +1,196 @@
 import AWS from 'aws-sdk'
+import { PlusOutputReport } from '../models/PlusOutputReport';
+import { PROOutputReport } from '../models/ProOutputReport';
 require('dotenv').config();
 
-let credential = {
-  accessKeyId: process.env.ACCESS_KEY_ID ? process.env.ACCESS_KEY_ID : "EMPTY",
-  secretAccessKey: process.env.SECRET_ACCESS_KEY ? process.env.SECRET_ACCESS_KEY : "EMPTY"
+const credential = {
+  accessKeyId: process.env.PRO_ACCESS_KEY_ID ? process.env.PRO_ACCESS_KEY_ID : "EMPTY",
+  secretAccessKey: process.env.PRO_SECRET_ACCESS_KEY ? process.env.PRO_SECRET_ACCESS_KEY : "EMPTY"
 }
-const cloudwatch = new AWS.CloudWatch({
-  region: 'sa-east-1',
-  credentials: new AWS.Credentials(credential)
-});
 
-// const params = {
-//   MetricDataQueries: [
-//     {
-//       Id: 'm1',
-//       MetricStat: {
-//         Metric: {
-//           Dimensions: [
-//             {
-//               Name: 'InstanceId',
-//               Value: 'All'
-//             },
-//             {
-//               Name: 'InstanceName',
-//               Value: 'All'
-//             }
-//           ],
-//           MetricName: 'CPUUtilization',
-//           Namespace: 'AWS/EC2'
-//         },
-//         Period: 3600,
-//         Stat: 'Maximum'
-//       }
-//     }
-//   ],
-//   StartTime: new Date('2023-01-01T00:00:00Z'),
-//   EndTime: new Date('2023-01-02T00:00:00Z')
-// };
+export class AWSService {
+  region = 'sa-east-1';
 
-// // cloudwatch.getMetricData(params, (err, data) => {
-// //   if (err) {
-// //     console.log(err, err.stack);
-// //   } else {
-// //     console.log(data);
-// //   }
-// // });
+  constructor( public credentials: typeof credential ) {  }
 
-const ec2 = new AWS.EC2({
-  region: 'sa-east-1',
-  credentials: new AWS.Credentials(credential)
-});
+  cloudwatch = new AWS.CloudWatch({
+    region: this.region,
+    credentials: new AWS.Credentials(this.credentials)
+  });
 
-ec2.describeInstances((err, data) => {
+  ec2 = new AWS.EC2({
+    region: this.region,
+    credentials: new AWS.Credentials(this.credentials)
+  });
 
-  let instances = data.Reservations?.map(data => data.Instances?.map(mapInstanceData)).flat()
-  instances?.map(instance => instance?.Tags);
-})
+  async getMetricsDataFromWidgetImage(params: { MetricWidget: any }) {
+    const calback = (err:any, data:any)=> {
+      if (err) console.log(err, err.stack);
+      else console.log(data);
+    }
 
-function mapInstanceData(instance: AWS.EC2.Instance) {
-  const {
-    InstanceId,
-    InstanceType,
-    KeyName,
-    Monitoring,
-    Placement,
-    Platform,
-    PrivateDnsName,
-    PrivateIpAddress,
-    PublicDnsName,
-    PublicIpAddress,
-    Tags,
-    PlatformDetails,
-    State
-  } = instance
+    const data = await this.cloudwatch.getMetricWidgetImage(params)
 
-  const mappedData = {
-    Produto: Tags?.find( tag => tag.Key == 'product' )?.Value || undefined,
-    Label: Tags?.find( tag => tag.Key == 'Name' )?.Value || undefined,
-    State: State?.Name,
-    InstanceId,
-    InstanceType,
-    KeyName,
-    Monitoring: Monitoring?.State,
-    Region: Placement?.AvailabilityZone,
-    Platform,
-    PrivateDnsName,
-    PrivateIpAddress,
-    PublicDnsName,
-    PublicIpAddress,
-    Tags,
-    PlatformDetails ,
+    return data.promise()
   }
 
-  return mappedData;
+  async getMetricsDataFromCloudWatch(metricsParams: AWS.CloudWatch.GetMetricDataInput) {
+    const response = await this.cloudwatch.getMetricData(metricsParams).promise();
+    console.log(response.MetricDataResults);
+
+    return response;
+  }
+
+  async describeInstancesFromEC2( instancesParams: any ) {
+    this.ec2.describeInstances((err, data) => {
+      let instances = data.Reservations?.map(data => data.Instances?.map(this.mapInstanceData)).flat()
+
+      return instances
+    })
+  }
+
+  mapInstanceData(instance: AWS.EC2.Instance) {
+    const {
+      InstanceId,
+      InstanceType,
+      KeyName,
+      Monitoring,
+      Placement,
+      Platform,
+      PrivateDnsName,
+      PrivateIpAddress,
+      PublicDnsName,
+      PublicIpAddress,
+      Tags,
+      PlatformDetails,
+      State
+    } = instance
+  
+    const mappedData = {
+      Produto: Tags?.find(tag => tag.Key == 'product')?.Value || undefined,
+      Label: Tags?.find(tag => tag.Key == 'Name')?.Value || undefined,
+      State: State?.Name,
+      InstanceId,
+      InstanceType,
+      KeyName,
+      Monitoring: Monitoring?.State,
+      Region: Placement?.AvailabilityZone,
+      Platform,
+      PrivateDnsName,
+      PrivateIpAddress,
+      PublicDnsName,
+      PublicIpAddress,
+      Tags,
+      PlatformDetails,
+    }
+  
+    return mappedData;
+  }
+
 }
 
-// const params = {
-//   MetricDataQueries: [
-//     {
-//       Id: 'm1',
-//       ReturnData: true,
-//       MetricStat: {
-//         Metric: {
-//           Namespace: 'AWS/EC2',
-//           MetricName: 'CPUUtilization',
-//         },
-//         Period: 3600,
-//         Stat: 'Maximum'
-//       },
-//     },
-//   ],
-//   StartTime: new Date('2022-01-01T00:00:00Z'),
-//   EndTime: new Date('2022-01-02T00:00:00Z'),
-// };
+const params = {
+  StartTime: new Date("2023-01-01"), // 1 hour ago
+  EndTime: new Date(),
+  MetricDataQueries: [
+    {
+      Id: "m1",
+      MetricStat: {
+        Metric: {
+          Namespace: "AWS/EC2",
+          MetricName: "CPUUtilization",
+          Dimensions: [
+            {
+              Name: "InstanceId",
+              Value: "i-093d9a60caca17d09"
+            }
+          ]
+        },
+        Period: 3600,
+        Stat: "Maximum"
+      },
+      Label: "Cliente - ROMAP (SQL)",
+      ReturnData: true
+    },
+    {
+      Id: "m2",
+      MetricStat: {
+        Metric: {
+          Namespace: "AWS/EC2",
+          MetricName: "CPUUtilization",
+          Dimensions: [
+            {
+              Name: "InstanceId",
+              Value: "i-010adcf1add463467"
+            }
+          ]
+        },
+        Period: 3600,
+        Stat: "Maximum"
+      },
+      Label: "SQL Server - 01",
+      ReturnData: true
+    },
+    {
+      Id: "m3",
+      MetricStat: {
+        Metric: {
+          Namespace: "AWS/EC2",
+          MetricName: "CPUUtilization",
+          Dimensions: [
+            {
+              Name: "InstanceId",
+              Value: "i-06101a321fb20fd90"
+            }
+          ]
+        },
+        Period: 3600,
+        Stat: "Maximum"
+      },
+      Label: "SQL Server - 04",
+      ReturnData: true
+    },
+    {
+      Id: "m4",
+      MetricStat: {
+        Metric: {
+          Namespace: "AWS/EC2",
+          MetricName: "CPUUtilization",
+          Dimensions: [
+            {
+              Name: "InstanceId",
+              Value: "i-0d6816f40326b35f2"
+            }
+          ]
+        },
+        Period: 3600,
+        Stat: "Maximum"
+      },
+      Label: "SQL Server - 05",
+      ReturnData: true
+    },
+    {
+      Id: "m5",
+      MetricStat: {
+        Metric: {
+          Namespace: "AWS/EC2",
+          MetricName: "CPUUtilization",
+          Dimensions: [
+            {
+              Name: "InstanceId",
+              Value: "i-0ead036376a9bea1c"
+            }
+          ]
+        },
+        Period: 3600,
+        Stat: "Maximum"
+      },
+      Label: "SQL Server - 01 - GC",
+      ReturnData: true
+    }
+  ],
+  ScanBy: "TimestampDescending"
+};
 
 // cloudwatch.getMetricData(params).promise()
 //   .then(async data => {

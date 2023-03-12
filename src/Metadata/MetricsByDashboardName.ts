@@ -10,6 +10,13 @@ export const metricsByDashboardName: DashboardMetadata[] = [
         product: "Quiver PLUS"
     },
     {
+        dashboardName: "Memoria_SQL_WWW",
+        // account: "PG",
+        service: "Database",
+        resource: "Memory",
+        product: "Quiver PLUS"
+    },
+    {
         dashboardName: "CPUUtilization_-_WEBs",
         // account: "PG",
         service: "Application",
@@ -17,18 +24,25 @@ export const metricsByDashboardName: DashboardMetadata[] = [
         product: "Quiver PLUS"
     },
     {
-        dashboardName: "Memória_SQL_WWW",
-        // account: "PG",
-        service: "Database",
-        resource: "Memory",
-        product: "Quiver PLUS"
-    },
-    {
-        dashboardName: "Memória_Apicação_WEB",
+        dashboardName: "Memoria_Aplicacao_WEB",
         // account: "PG",
         service: "Application",
         resource: "Memory",
         product: "Quiver PLUS"
+    },
+    {
+        dashboardName: "Quiver_PRO",
+        // account: "SP",
+        service: "Application",
+        resource: "CPU",
+        product: "Quiver PRO"
+    }, 
+    {
+        dashboardName: "Memoria_AppQuiverPRO",
+        // account: "PG",
+        service: "Application",
+        resource: "Memory",
+        product: "Quiver PRO"
     },
     {
         dashboardName: "SQL_SERVER_-_CPU",
@@ -38,24 +52,11 @@ export const metricsByDashboardName: DashboardMetadata[] = [
         product: "Quiver PRO"
     },
     {
-        dashboardName: "Quiver_PRO",
-        // account: "SP",
-        service: "Application",
-        resource: "CPU",
-        product: "Quiver PRO"
-    },
-    {
-        dashboardName: "Memória_Banco_QuiverPRO",
+        dashboardName: "Memoria_Banco_QuiverPRO",
         // account: "PG",
         service: "Database",
         resource: "Memory",
         product: "Quiver PRO"
     },
-    {
-        dashboardName: "Memória_AppQuiverPRO",
-        // account: "PG",
-        service: "Application",
-        resource: "Memory",
-        product: "Quiver PRO"
-    }
+   
 ]

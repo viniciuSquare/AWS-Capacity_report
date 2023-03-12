@@ -5,10 +5,30 @@
   </head>
   <body>
     <h1>Upload an Excel file</h1>
-    <form method="POST" action="/upload" enctype="multipart/form-data">
-      <input type="file" name="file" accept=".xlsx,.xls,.csv" required>
+    <form method="POST" action="/upload" enctype="multipart/form-data" id='submit-form' >
+      <input type="file" name="file" accept=".xlsx,.xls,.csv" required multiple>
       <button type="submit">Upload</button>
     </form>
   </body>
+
+  <script>
+    const form = document.getElementById('submit-form');
+    console.log(form)
+    form.addEventListener('submit', (event) => {
+      event.preventDefault(); // prevent the form from submitting
+      window.formDataDetails = event;
+      // console.log(new FormData(form));
+
+      const xhr = new XMLHttpRequest(); // create a new XMLHttpRequest object
+      xhr.open('POST', form.action, true); // set up the request
+      xhr.setRequestHeader('enctype', 'multipart/form-data'); // set the enctype header
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) { // handle the response
+          console.log(xhr.responseText);
+        }
+      };
+      xhr.send(new FormData(form));
+    });
+  </script>
   
 </html>

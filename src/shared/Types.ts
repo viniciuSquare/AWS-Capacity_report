@@ -11,11 +11,12 @@ export interface MetricDetails {
     // account: "PG" | "SP",
     service?: "Application" | "Database",
     resource?: "CPU" | "Memory",
+    product?: "Quiver PRO" | "Quiver PLUS"
 }
 
 export interface AWSDetails {
     region: string,
-    instances?: Instance[],
+    instances?: Instance[]
 }
 
 export interface MetricsReportMetadata {

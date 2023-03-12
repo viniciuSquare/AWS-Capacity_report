@@ -29,7 +29,7 @@ export class AWSMetricsController {
         return await Promise.all(processedMetricsPromises.flat())
     }
     
-    // Await report hadler to feed metrics data
+    // Await report hadler to feed metrics data on local folder
     private async getMetricsFromFileQueue() {
         console.log('1 - Getting metrics from files on queue\n');
 
@@ -37,31 +37,41 @@ export class AWSMetricsController {
 
         const metricsFromFiles = filesFromQueue.map((file) => new AWSMetricsFileHandler(file))
 
-        const data = await Promise.all(metricsFromFiles.map(async awsReportHandler =>  {
-            await awsReportHandler.feedDataFromFile();
-
-            const awsInstancesMetadata = await this.feedMetadataFromFile( awsReportHandler );
-            if (awsInstancesMetadata)
-                awsReportHandler.setInstancesDetails(awsInstancesMetadata)
-
-            await awsReportHandler.feedMetricsFromFile()
-
-        })).then(()=> metricsFromFiles)
+        const data = await Promise.all(
+                metricsFromFiles.map( awsReport => this.processRawData(awsReport))
+            ).then(()=> metricsFromFiles)
         
         return data
+    }
+
+    async processRawData( 
+        awsRawReport: AWSMetricsFileHandler, 
+        contentInputType: 'local' | 'upload' = "local",
+        dataBuffer: Buffer | null = null
+    )  {
+        await awsRawReport.feedRawData(contentInputType, dataBuffer);
+
+        const awsInstancesMetadata = await this.feedMetadataFromRawData( awsRawReport );
+        if (awsInstancesMetadata)
+            awsRawReport.setInstancesDetails(awsInstancesMetadata)
+
+        await awsRawReport.feedMetricsFromFile()
+        return awsRawReport;
     }
     
     // To improve metadata sharing through many reports processing, 
      // * if there is a region change, metadadata is updated
-    private async feedMetadataFromFile(awsReportHandler: AWSMetricsFileHandler) {
+    private async feedMetadataFromRawData(awsReportHandler: AWSMetricsFileHandler) {
         console.log("Metadata verification for ", awsReportHandler.region," region.")
 
-        const resource = awsReportHandler.metricResource
-        const service = awsReportHandler.MetricsDatabaseService
+        const resource = awsReportHandler.metricsResource
+        const service = awsReportHandler.metricsService
+        const product = awsReportHandler.metricsProduct
         
         this.metricDetails = {
-            resource: resource,
-            service: service
+            resource,
+            service,
+            product: product?.replace('_',' ') as "Quiver PRO" | "Quiver PLUS" | undefined
         }
 
         if (!(this.awsDetails?.region == awsReportHandler.region)) {
@@ -80,9 +90,10 @@ export class AWSMetricsController {
 
     private async feedInstanceDetailsMetadata() {
         console.log("\n►►► Feeding metadata")
+        const product = this.metricDetails?.product?.split(' ')[1] as 'PRO' | 'PLUS'
 
         if (this.awsDetails?.region) {
-            const metadata = new InstancesMetadataHelper(this.awsDetails)
+            const metadata = new InstancesMetadataHelper(this.awsDetails, product)
             const { instances } = await metadata.getMetadata()
 
             this.awsDetails.instances = instances

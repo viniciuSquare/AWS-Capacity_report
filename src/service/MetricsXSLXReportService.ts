@@ -1,95 +1,96 @@
 import fs from "fs";
 import XLSX from 'xlsx'
 import { AWSMetricsFileHandler } from "../handlers/AWSMetricsFileHandler";
-import { CSVFile } from "../handlers/CSVFile";
 import { Metric } from "../models/Metric";
+import { MetricsDatabaseService } from "./MetricsDatabaseService";
 
 export class MetricsXLSXReportService {
-    public srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
+	public srcCodeBaseDir = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/');
 
-    private treatedDirPath = this.srcCodeBaseDir + "/Treated";    
+	private treatedDirPath = this.srcCodeBaseDir + "/Treated";
 
-    public workbook: XLSX.WorkBook;
-    public metrics: Metric[] = [];
+	public workbook: XLSX.WorkBook;
+	public metrics: Metric[] = [];
 
-    constructor( private report: AWSMetricsFileHandler) {
-        this.workbook = XLSX.utils.book_new();
-        this.metrics = report.getMetricsOnValidPeriod();
+	constructor(private report: AWSMetricsFileHandler) {
+		this.workbook = XLSX.utils.book_new();
+		this.metrics = report.getMetricsOnValidPeriod();
 
-        this.checkStructureIntegrity();
-    }
+		this.checkStructureIntegrity();
+	}
 
-    async checkStructureIntegrity() {
-        const sourceDirPathList = await fs.readdirSync(this.srcCodeBaseDir, 'utf-8');
+	async checkStructureIntegrity() {
+		const sourceDirPathList = await fs.readdirSync(this.srcCodeBaseDir, 'utf-8');
 
-        if (!this.isStructureCreated(sourceDirPathList)) {
-            // TODO -> HANDLE DIRS CREATION
-            console.log("!!!!!! CREATE BASE STRUCTURE !!!!!!\n\n");
-        }
-    }
+		if (!this.isStructureCreated(sourceDirPathList)) {
+			// TODO -> HANDLE DIRS CREATION
+			console.log("!!!!!! CREATE BASE STRUCTURE !!!!!!\n\n");
+		}
+	}
 
-    isStructureCreated = (sourceDirPathList: string[]) => (sourceDirPathList.filter(dir => ( dir == 'Raw' || dir == 'Treated' )))
+	isStructureCreated = (sourceDirPathList: string[]) => (sourceDirPathList.filter(dir => (dir == 'Raw' || dir == 'Treated')))
 
-    // ------------------------------> <------------------------------
-    
-    setWorkbook(workbook: XLSX.WorkBook) {
-        this.workbook = workbook;
-    }
+	// ------------------------------> <------------------------------
 
-    public async buildExcel(path = this.treatedDirPath) {
-        // TODO - Verify if is it created
-        const metricsByDay = await this.metricsByDay()
+	setWorkbook(workbook: XLSX.WorkBook) {
+		this.workbook = workbook;
+	}
 
-        let days = Object.keys( metricsByDay );
+	public async buildExcel(path = this.treatedDirPath) {
+		const metricsService = new MetricsDatabaseService(this.report);
 
-        console.log("days ", metricsByDay, days);
+		const metricsByTime = metricsService.metricsByTime();
 
-        const worksheets = days.map( async day => {
-            const metricByDay = await this.metricsByDay();
-            const worksheet = this.creteWorkbook(metricByDay[day])
-            // console.log(this.metricsByDay());
-            return { day, worksheet }
-        }) 
+		let keys = Object.keys(metricsByTime);
 
-        await Promise.all(worksheets).then(data => {
-            data.map( ({ day, worksheet }) => {
-                XLSX.utils.book_append_sheet(this.workbook, worksheet, day);
-            } )
-        }).then(()=> {
-            var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
-            console.log("Day metrics into workbook", this.treatedDirPath, "\n");
-    
-            XLSX.writeFileXLSX(
-                this.workbook,
-                `${path}/${this.report.dashboardMetadataFromFilename.dashboardName}.xlsx`,
-                wopts
-            );
-        })
+		// console.log("days ", metricsByTime, keys);
+
+		const worksheets = keys.map(async day => {
+			const metricByDay = metricsByTime
+			const worksheet = this.creteWorkbook(metricByDay[day])
+			// console.log(this.metricsByTime);
+			return { day, worksheet }
+		})
+
+		await Promise.all(worksheets).then(data => {
+			data.map(({ day, worksheet }) => {
+				const sheetName = day.replace('/','-').replace('/','-')
+				
+				XLSX.utils.book_append_sheet(this.workbook, worksheet, sheetName);
+			})
+		}).then(() => {
+			var wopts: XLSX.WritingOptions = { bookType: 'xlsx', bookSST: false, type: 'binary' };
+			console.log("Day metrics into workbook", this.treatedDirPath, "\n");
+			const { resource, service, product } = this.report.dashboardMetadataFromFilename;
+
+			XLSX.writeFileXLSX(
+				this.workbook,
+				`${path}/${product} - ${service} - ${resource}.xlsx`,
+				wopts
+			);
+		})
+	}
+
+	creteWorkbook(jsonData: object[]) {
+		this.createWorkbookIndexes(jsonData);
+		// console.log("Json Data", jsonData);
+
+		let worksheet = XLSX.utils.json_to_sheet(jsonData);
+		// console.log("Worksheet ->", worksheet)
+		
+		return worksheet
+	}
 
 
-    }
 
-    metricsByDay() {
-        let groupByDay = CSVFile.groupBy('monthDate');
-        const metricsGroupedByDay = groupByDay(this.metrics);
+	/** *
+	 * head: "Product | Service  | Resource"
+	 * 
+	 */
 
-        let metricsByDayFiltered: { [key: string]: object[] } = {}
+	createWorkbookIndexes(data:object[]) {
+		
+	}
 
-        let days = Object.keys(metricsGroupedByDay);
-        console.log(days)
-
-        days.forEach(day => {
-            metricsByDayFiltered[day] = []
-
-            metricsByDayFiltered[day]
-                .push(...metricsGroupedByDay[day].filter((metric: Metric) => metric.isBusinessHour));
-        })
-        return metricsByDayFiltered
-    }
-
-    creteWorkbook(jsonData: object[]) {
-        let worksheet = XLSX.utils.json_to_sheet(jsonData);
-        return worksheet
-    }
 
 }

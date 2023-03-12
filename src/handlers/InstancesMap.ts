@@ -14,14 +14,20 @@ export class InstancesMetadataHelper {
     private metadataDir: string = __dirname.split('/').splice(0, __dirname.split('/').length - 1).join('/') + '/Metadata';
 
     private ec2: AWS.EC2 | null = null;
-    private credentials = {
-        accessKeyId: process.env.ACCESS_KEY_ID ? process.env.ACCESS_KEY_ID : "EMPTY",
-        secretAccessKey: process.env.SECRET_ACCESS_KEY ? process.env.SECRET_ACCESS_KEY : "EMPTY"
-    }
-
+    private credentials: {
+        accessKeyId: string,
+        secretAccessKey: string
+    };
+    
     constructor(
-        private metadata: AWSDetails
-    ) {   }
+        private metadata: AWSDetails,
+        private product: "PRO" | "PLUS"
+    ) { 
+        this.credentials = {
+            accessKeyId: process.env[`${this.product}_ACCESS_KEY_ID`] ?? "EMPTY",
+            secretAccessKey: process.env[`${this.product}_SECRET_ACCESS_KEY`] ?? "EMPTY"
+        }
+    }
 
     async getMetadata(): Promise<AWSDetails> {
 
@@ -58,7 +64,8 @@ export class InstancesMetadataHelper {
         }        
     }
 
-    private async feedInstancesData() {
+    async feedInstancesData() {
+        console.debug(this.credentials);
         // Instances data 
         this.ec2 = new EC2({
             region: this.metadata.region,
@@ -67,7 +74,7 @@ export class InstancesMetadataHelper {
 
         let ec2InstancesDescriptionPromise = this.ec2.describeInstances().promise();
 
-        ec2InstancesDescriptionPromise.then(async instancesDescriptions => {
+        return ec2InstancesDescriptionPromise.then(async instancesDescriptions => {
             console.log('Feeding instances\n');
 
             let persistencePromises: any = []
@@ -110,7 +117,7 @@ export class InstancesMetadataHelper {
     // ------------
     private saveInstancesToJSONFile() {
         const parsedData = JSON.stringify(this.metadata, null, 2)
-        console.log('Saving JSON file with instances!!\n', parsedData);
+        console.debug('Saving JSON file with instances!!\n', parsedData);
         fs.writeFile(
             `${this.metadataDir}/${this.metadata.region}.json`,
             parsedData, "utf-8",

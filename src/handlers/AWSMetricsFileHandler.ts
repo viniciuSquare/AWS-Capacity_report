@@ -2,40 +2,68 @@ import { AWSDetails, DashboardMetadata } from "../shared/Types";
 import { CSVFile } from "./CSVFile";
 import { metricsByDashboardName } from "../Metadata/MetricsByDashboardName";
 import { Metric } from "../models/Metric";
+import { Instance } from "../models/Instance";
+import { QuiverProducts } from "@prisma/client";
 
 /**
  * Handle AWS metrics CSV report 
  * */
-export class AWSMetricsFileHandler extends CSVFile {
+export class AWSMetricsFileHandler {
 
-    headerEndLine = 4;
+    private headerEndLine = 4;
+    private data: string = '';
 
     metadata: AWSDetails | null = null;
     metrics: Metric[] = []
 
-    constructor(filename: string) {
-        super(filename);
+    constructor( public fileName: string ) { }
+
+    async feedRawData (
+        contentInputType: 'local' | 'upload' = "local",
+        dataBuffer: Buffer | null = null
+    ) {
+        switch (contentInputType) {
+            case 'local':
+                this.data = await CSVFile.getDataFromFile(this.fileName)
+                break;
+            case 'upload':
+                if(!dataBuffer)
+                    throw new Error("No uploaded data");
+                this.data = dataBuffer.toString('utf8');
+
+                break;
+        }
     }
 
     async feedMetricsFromFile() {
-
         const data = await Promise.all(
             this.rawContentArray.map(async (row, line) => {
                 if (line == 0) return // Skip header                
 
                 let metricsFromCSVRow = Array.from({ length: this.header.length - 1 }, async (_, idx) => {
-                    const instancesHeaderValidIndex = idx+1;
-                    let metric = new Metric();
+                    const headerValidIndex = idx + 1;
+
+                    const dateStringFromRow = row.split(',')[0];
+
+                    let metric = new Metric(
+                        new Date(dateStringFromRow),
+                        Number(Number(row.split(',')[headerValidIndex]).toFixed(2)),
+                        this.metricsService,
+                        this.metricsResource,
+                        this.metricsProduct
+                    );
 
                     // Feed metric metadata
-                    const dateStringFromRow = row.split(',')[0];
-                    metric.date = new Date(dateStringFromRow);
-                    metric.resource = this.metricResource
-                    metric.service = this.MetricsDatabaseService
-                    metric.maximumUsage = Number(Number(row.split(',')[instancesHeaderValidIndex]).toFixed(2))
-
-                    const instance = await this.instanceFromId(this.header[instancesHeaderValidIndex]);
-                    if (instance) metric.instance = instance
+                    const instance = await this.instanceFromId(this.header[headerValidIndex]);
+                    if (instance) {
+                        metric.instance = instance
+                    } else {
+                        let instanceAux = new Instance();
+                        instanceAux.product = this.metricsProduct;
+                        instanceAux.label = this.header[headerValidIndex];
+                        
+                        metric.instance = instanceAux
+                    }
 
                     return metric
                 });
@@ -72,14 +100,15 @@ export class AWSMetricsFileHandler extends CSVFile {
 
         return instancesData
             .map(label => {
-                if (label.includes("InstanceId")) {
-                    const instanceSize = 19;
+                if (label.includes("InstanceId") || label.includes("host")) {
+                    const labelHolder = label.includes("InstanceId") ? "InstanceId" : "host"
 
-                    let startIdx = label.indexOf("InstanceId") + "InstanceId".length + 1;
-                    let endIdx = startIdx + instanceSize;
+                    let startIdx = label.indexOf(labelHolder) + labelHolder.length + 1;
+                    let endIdx = startIdx + label.slice(startIdx, label.length).indexOf(' ');
 
                     return label.slice(startIdx, endIdx);
                 }
+
                 return "Data/Hora"
             })
     }
@@ -87,35 +116,38 @@ export class AWSMetricsFileHandler extends CSVFile {
     get region() {
         let headerLines = this.rawDataArray.slice(0, this.headerEndLine);
         const startIdx = headerLines[3].indexOf("Full label,") + "Full label,".length
-        const endIdx = headerLines[3].indexOf(":AWS/EC2")
+        const endIdx = headerLines[3].indexOf(":AWS/EC2") > 0 ? headerLines[3].indexOf(":AWS/EC2") : headerLines[3].indexOf(":CWAgent")
 
         let instancesData = headerLines[3].slice(startIdx, endIdx);
 
         return instancesData
     }
 
-    get metricResource() {
-        return this.dashboardMetadataFromFilename?.resource
+    get metricsResource() {
+        return this.dashboardMetadataFromFilename.resource
 
     }
 
-    get MetricsDatabaseService() {
-        return this.dashboardMetadataFromFilename?.service
+    get metricsService() {
+        return this.dashboardMetadataFromFilename.service
 
     }
 
-    get metricProduct() {
-        return this.dashboardMetadataFromFilename?.product
+    get metricsProduct(): QuiverProducts | undefined {
+        return this.dashboardMetadataFromFilename.product?.replace(" ","_") as QuiverProducts
 
     }
 
     get dashboardMetadataFromFilename() {
-        const dashboardNameFromFilename = this.fileName.split('-')[0]
+        const nameSplit = this.fileName.split('-')
+        const dashboardNameFromFilename = nameSplit.length > 5 ? `${nameSplit[0]}-${nameSplit[1]}` : nameSplit[0]
 
         // TODO - Improve null verification
         const dash: DashboardMetadata = {
             dashboardName: dashboardNameFromFilename,
         }
+        const filteredName = metricsByDashboardName.find(({ dashboardName }) => dashboardNameFromFilename == dashboardName)
+        // console.debug(dashboardNameFromFilename, filteredName, filteredName?"\tFOUND":"\tNOT FOUND")
         return metricsByDashboardName.find(({ dashboardName }) => dashboardNameFromFilename == dashboardName) || dash
     }
 
@@ -147,5 +179,13 @@ export class AWSMetricsFileHandler extends CSVFile {
     private instanceFromId(instanceId: string) {
         return this.metadata?.instances?.find(instance => instance?.instanceId == instanceId);
 
+    }
+
+    private get rawDataArray(): string[] {
+        return this.data.split('\n');
+    }
+
+    private get rawContentArray() {
+        return this.rawDataArray.slice(this.headerEndLine, this.rawDataArray.length);
     }
 }
