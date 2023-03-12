@@ -8,5 +8,5 @@ src/Treated/*
 *.csv
 src/Metadata/PRO/*
 src/Metadata/PLUS/*
-
+database/
 .env
