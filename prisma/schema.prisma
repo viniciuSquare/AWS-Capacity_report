@@ -15,19 +15,22 @@ datasource db {
 }
 
 model Metrics {
-  id           Int            @id @default(autoincrement())
-  resource     MetricResource
-  service      MetricsDatabaseService
+  id           Int             @id @default(autoincrement())
+  resource     MetricResource?
+  service      MetricService?
   instanceId   Int
   maximumUsage Float
   date         DateTime
+  period       Periods?
+  product      QuiverProducts?
 
   instance Instances @relation(fields: [instanceId], references: [id])
 
   @@unique([resource, service, instanceId, date])
+  @@map("metrics")
 }
 
-enum MetricsDatabaseService {
+enum MetricService {
   Application
   Database
 }
@@ -62,7 +65,7 @@ model Instances {
 model AWSDashboardDetails {
   id            Int            @id @default(autoincrement())
   dashboardName String
-  service       MetricsDatabaseService
+  service       MetricService
   resource      MetricResource
   product       QuiverProducts
 
@@ -72,4 +75,11 @@ model AWSDashboardDetails {
 enum QuiverProducts {
   Quiver_PRO
   Quiver_PLUS
+}
+
+enum Periods {
+  DIA
+  NORMAL
+  PICO
+  NOTURNO
 }
